@@ -1,0 +1,2651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Meghan & Nolan</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪩</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Raleway:wght@300;400;500;600&family=Sacramento&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Georgia', serif;
+      background: #000; /* Black to match video during password phase */
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    
+    
+    /* Video background - fixed overlay that fades out */
+    .video-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 100;
+      overflow: hidden;
+      opacity: 1;
+      /* ease-in: slow start, fast end */
+      transition: opacity 1.5s ease-in;
+      pointer-events: none;
+    }
+    
+    .video-background video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      pointer-events: none;
+    }
+    
+    /* Dark overlay removed for brighter video */
+    .video-background::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0);
+      pointer-events: none;
+    }
+    
+    /* Fallback gradient if video doesn't load */
+    body.no-video {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    /* Fade out video when content is visible */
+    body.content-visible .video-background {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .container {
+      /* Container just holds password page and main content */
+    }
+    
+    .password-page {
+      position: fixed;
+      top: calc(58vh - 50px); /* Same position as before */
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      z-index: 200;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      transition: opacity 0.5s ease-out;
+    }
+    
+    .password-page.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    
+    .password-page h1 {
+      color: #fff;
+      margin-bottom: 20px;
+      font-size: 2.5em;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    
+    .password-page p {
+      color: #fff;
+      margin-bottom: 30px;
+      font-size: 1.1em;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+    }
+    
+    .password-input {
+      width: 100%;
+      max-width: 300px;
+      padding: 15px 20px;
+      font-size: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      border: 1px solid rgba(200, 200, 200, 0.9);
+      border-radius: 10px;
+      transition: border-color 0.3s, color 0.3s;
+      margin: 0;
+      height: 50px;
+      background: transparent;
+      color: rgba(180, 180, 180, 0.95);
+      text-align: center;
+    }
+    
+    .password-input::placeholder {
+      color: rgba(200, 200, 200, 0.85);
+      font-style: italic;
+      text-align: center;
+    }
+    
+    .password-input:focus {
+      outline: none;
+      border-color: rgba(68, 68, 68, 0.8);
+    }
+    
+    .password-input-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 15px;
+      position: relative;
+    }
+    
+    /* Ensure input stays visible on mobile when keyboard opens */
+    .password-input.granted {
+      color: #4ade80;
+      border-color: #4ade80;
+    }
+    
+    .btn {
+      background: rgba(68, 68, 68, 0.7);
+      color: white;
+      border: none;
+      padding: 0;
+      font-size: 24px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+      font-weight: bold;
+      width: 50px;
+      height: 50px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      line-height: 1;
+      backdrop-filter: blur(10px);
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(68, 68, 68, 0.4);
+      background: rgba(68, 68, 68, 0.85);
+    }
+    
+    .btn:active {
+      transform: translateY(0);
+    }
+    
+    .error-message {
+      color: #ff6b6b;
+      margin-top: 15px;
+      font-size: 14px;
+      min-height: 20px;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+      font-weight: 500;
+    }
+    
+    /* ========== MAIN CONTENT STYLES ========== */
+    /* Main content sits behind video/password, already in position */
+    .main-content {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #faf9f7;
+      font-family: 'Raleway', sans-serif;
+      overflow-y: auto;
+      overflow-x: hidden;
+      z-index: 50;
+    }
+    
+    /* When shown - just display it, no animation */
+    .main-content.shown {
+      display: block;
+    }
+    
+    /* Mobile: flex container for title bar + scroll area */
+    @media (max-width: 768px) {
+      .main-content.shown {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+    }
+    
+    /* Site Header */
+    .site-header {
+      text-align: center;
+      padding: 40px 20px 20px;
+      background: #faf9f7;
+    }
+    
+    .site-title {
+      font-family: 'Bodoni Moda', serif;
+      font-size: 4em;
+      font-weight: 400;
+      color: #1a1a1a;
+      letter-spacing: 2px;
+      margin-bottom: 15px;
+    }
+    
+    .site-title .ampersand {
+      font-style: normal;
+    }
+    
+    .site-date {
+      font-family: 'Raleway', sans-serif;
+      font-size: 1.1em;
+      font-weight: 400;
+      color: #333;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    
+    .site-date-mobile {
+      display: none;
+    }
+    
+    @media (max-width: 768px) {
+      .site-date {
+        display: none;
+      }
+      
+      .site-date-mobile {
+        display: block;
+        font-family: 'Raleway', sans-serif;
+        font-size: 1em;
+        font-weight: 400;
+        color: #333;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        text-align: center;
+      }
+      
+      .site-date-mobile .date-line,
+      .site-date-mobile .location-line {
+        display: block;
+      }
+      
+      .site-date-mobile .date-divider {
+        display: block;
+        width: 40px;
+        height: 2px;
+        background: #f3722b;
+        margin: 12px auto;
+      }
+    }
+    
+    /* Hide mobile elements on desktop */
+    .mobile-top-bar,
+    .mobile-menu,
+    .mobile-scroll-container {
+      display: none;
+    }
+    
+    /* Desktop Navigation */
+    .site-nav {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      padding: 20px;
+      background: #faf9f7;
+    }
+    
+    .site-nav a {
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.95em;
+      font-weight: 400;
+      color: #333;
+      text-decoration: none;
+      letter-spacing: 1px;
+      padding: 5px 0;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s;
+    }
+    
+    .site-nav a:hover,
+    .site-nav a.active {
+      border-bottom: 2px solid #f3722b;
+    }
+    
+    .site-nav a.active {
+      font-weight: 600;
+    }
+    
+    /* Mobile top bar - flex item with fixed size */
+    .mobile-top-bar {
+      display: none;
+      width: 100%;
+      height: 60px;
+      min-height: 60px;
+      max-height: 60px; /* Prevent growing */
+      flex-shrink: 0; /* Prevent shrinking */
+      flex-grow: 0; /* Prevent growing */
+      background: #faf9f7;
+      z-index: 1001;
+      border-bottom: 1px solid #eee;
+      touch-action: manipulation;
+      position: relative;
+    }
+    
+    /* Mobile countdown bar */
+    .mobile-countdown {
+      display: none;
+      width: 100%;
+      padding: 5px 20px;
+      background: #faf9f7;
+      border-bottom: 1px solid #eee;
+      align-items: center;
+      justify-content: space-around;
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.9em;
+      color: #333;
+    }
+    
+    .countdown-label-left {
+      font-family: 'Bodoni Moda', serif;
+      font-size: 1.5em;
+      font-weight: 400;
+      letter-spacing: 1px;
+      color: #333;
+    }
+    
+    .countdown-timer {
+      display: flex;
+      gap: 12px;
+    }
+    
+    .countdown-unit {
+      text-align: center;
+    }
+    
+    .countdown-number {
+      font-family: 'Bodoni Moda', serif;
+      font-size: 1.4em;
+      font-weight: 600;
+      color: #f3722b;
+      display: block;
+      font-variant-numeric: tabular-nums;
+    }
+    
+    .countdown-label {
+      font-size: 0.75em;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #666;
+    }
+    
+    /* Mobile hero photo */
+    .mobile-hero-photo {
+      display: none;
+      width: 100%;
+      overflow: hidden;
+    }
+    
+    .mobile-hero-photo img {
+      width: 100%;
+      height: auto;
+      display: block;
+      filter: brightness(1.1);
+    }
+    
+    .mobile-top-bar-title {
+      position: absolute;
+      top: 58%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Sacramento', cursive;
+      font-size: 2em;
+      font-weight: 400;
+      letter-spacing: 1px;
+      color: #333;
+      white-space: nowrap;
+    }
+    
+    /* Desktop scroll container - full page scrollable */
+    .desktop-scroll-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: #faf9f7;
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/Edge */
+    }
+    
+    .desktop-scroll-container::-webkit-scrollbar {
+      display: none; /* Chrome/Safari/Opera */
+    }
+    
+    /* Mobile scroll container */
+    .mobile-scroll-container {
+      display: none;
+      background: #faf9f7;
+    }
+    
+    /* Mobile hamburger button */
+    .hamburger {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 15px;
+      transform: translateY(-50%);
+      z-index: 1002;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 10px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    /* Large clickable area for hamburger menu */
+    .hamburger-click-area {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 25%;
+      height: 100%;
+      z-index: 1001;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    .hamburger span {
+      display: block;
+      width: 25px;
+      height: 2px;
+      background: #333;
+      margin: 5px 0;
+      transition: all 0.3s;
+    }
+    
+    .hamburger.active span:nth-child(1) {
+      transform: rotate(45deg) translate(5px, 5px);
+    }
+    
+    .hamburger.active span:nth-child(2) {
+      opacity: 0;
+    }
+    
+    .hamburger.active span:nth-child(3) {
+      transform: rotate(-45deg) translate(5px, -5px);
+    }
+    
+    /* Mobile menu overlay */
+    .mobile-menu {
+      display: none;
+      position: fixed;
+      top: 60px;
+      left: 0;
+      width: 100%;
+      height: calc(100% - 60px);
+      background: #faf9f7;
+      z-index: 1000;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    
+    .mobile-menu.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    /* Icon scroller in mobile menu */
+    .menu-icon-scroller {
+      position: absolute;
+      bottom: 5vh;
+      left: 0;
+      width: 100%;
+      overflow: hidden;
+      padding: 20px 0;
+    }
+    
+    .menu-icon-scroller-top {
+      position: absolute;
+      top: 4vh;
+      left: 0;
+      width: 100%;
+      overflow: hidden;
+      padding: 20px 0;
+    }
+    
+    .icon-track {
+      display: flex;
+      animation: scroll-icons 20s linear infinite;
+      width: fit-content;
+    }
+    
+    .icon-track-reverse {
+      display: flex;
+      animation: scroll-icons-reverse 20s linear infinite;
+      width: fit-content;
+    }
+    
+    .icon-track img,
+    .icon-track-reverse img {
+      height: 40px;
+      width: 40px;
+      margin: 0 25px;
+      display: inline-block;
+      filter: brightness(0) saturate(100%) invert(48%) sepia(85%) saturate(1703%) hue-rotate(347deg) brightness(98%) contrast(93%);
+    }
+    
+    /* Desktop vertical icon scrollers */
+    .desktop-icon-scroller {
+      position: fixed;
+      top: 0;
+      width: 50px;
+      height: 100vh;
+      overflow: hidden;
+      z-index: 10;
+      pointer-events: none;
+    }
+    
+    .desktop-icon-scroller.left {
+      left: 25px;
+    }
+    
+    .desktop-icon-scroller.right {
+      right: 25px;
+    }
+    
+    .desktop-icon-track {
+      display: flex;
+      flex-direction: column;
+      animation: scroll-icons-vertical 15s linear infinite;
+    }
+    
+    .desktop-icon-track-reverse {
+      display: flex;
+      flex-direction: column;
+      animation: scroll-icons-vertical-reverse 15s linear infinite;
+    }
+    
+    .desktop-icon-track img,
+    .desktop-icon-track-reverse img {
+      width: 36px;
+      height: 36px;
+      margin: 20px auto;
+      display: block;
+      filter: brightness(0) saturate(100%) invert(48%) sepia(85%) saturate(1703%) hue-rotate(347deg) brightness(98%) contrast(93%);
+      opacity: 0.7;
+    }
+    
+    @keyframes scroll-icons-vertical {
+      0% {
+        transform: translateY(0);
+      }
+      100% {
+        transform: translateY(-50%);
+      }
+    }
+    
+    @keyframes scroll-icons-vertical-reverse {
+      0% {
+        transform: translateY(-50%);
+      }
+      100% {
+        transform: translateY(0);
+      }
+    }
+    
+    /* Hide desktop scrollers on mobile */
+    @media (max-width: 768px) {
+      .desktop-icon-scroller {
+        display: none;
+      }
+    }
+    
+    /* Hide on narrower desktops where they'd overlap content */
+    @media (max-width: 1000px) {
+      .desktop-icon-scroller {
+        display: none;
+      }
+    }
+    
+    @keyframes scroll-icons-reverse {
+      0% {
+        transform: translateX(-50%);
+      }
+      100% {
+        transform: translateX(0);
+      }
+    }
+    
+    @keyframes scroll-icons {
+      0% {
+        transform: translateX(0);
+      }
+      100% {
+        transform: translateX(-50%);
+      }
+    }
+    
+    .mobile-menu-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    
+    .mobile-menu-title {
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.9em;
+      font-weight: 500;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #333;
+      margin-bottom: 30px;
+    }
+    
+    .mobile-menu-couple {
+      font-family: 'Bodoni Moda', serif;
+      font-size: 2.5em;
+      font-weight: 400;
+      color: #1a1a1a;
+      line-height: 1.3;
+    }
+    
+    .mobile-menu-couple .ampersand {
+      font-style: normal;
+    }
+    
+    .mobile-menu-date {
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.85em;
+      font-weight: 400;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #333;
+      margin-top: 15px;
+    }
+    
+    .mobile-menu nav {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 25px;
+      position: relative;
+      padding: 80px 0;
+    }
+    
+    .mobile-menu nav a {
+      font-family: 'Raleway', sans-serif;
+      font-size: 1.1em;
+      font-weight: 400;
+      color: #333;
+      text-decoration: none;
+      letter-spacing: 1px;
+    }
+    
+    .mobile-menu nav a.active {
+      border-bottom: 2px solid #f3722b;
+      padding-bottom: 2px;
+      font-weight: 600;
+    }
+    
+    /* Page sections */
+    .page-section {
+      display: none;
+      padding: 0 20px 60px 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .page-section.active {
+      display: block;
+    }
+    
+    /* Mobile: sections container and page sections fill available height */
+    @media (max-width: 768px) {
+      .mobile-sections {
+        height: 100%;
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .mobile-scroll-container .page-section {
+        height: 100%;
+      }
+      
+      .mobile-scroll-container .page-section.active {
+        height: 100%;
+        flex: 1;
+      }
+    }
+    
+    .page-section h2 {
+      font-family: 'Bodoni Moda', serif;
+      font-size: 2.5em;
+      font-weight: 400;
+      color: #1a1a1a;
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    
+    .page-section p {
+      font-family: 'Raleway', sans-serif;
+      font-size: 1.1em;
+      line-height: 1.8;
+      color: #444;
+      max-width: 800px;
+      margin: 0 auto 20px;
+    }
+    
+    /* Events list styling */
+    .events-list {
+      max-width: 750px;
+      margin: 0 auto;
+      padding-bottom: 60px;
+    }
+    
+    .home-hero-image {
+      max-width: 750px;
+      width: 100%;
+      max-height: 420px;
+      margin: 0 auto 20px;
+      display: block;
+      border-radius: 8px;
+      object-fit: cover;
+      object-position: center bottom;
+      filter: brightness(1.1);
+    }
+    
+    .event-item {
+      background: #fafafa;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      padding: 40px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    
+    .event-title {
+      font-family: 'Bodoni Moda', serif;
+      font-size: 2em;
+      font-weight: 600;
+      letter-spacing: 2px;
+      color: #1a1a1a;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+    }
+    
+    .event-date {
+      font-family: 'Raleway', sans-serif;
+      font-size: 1.1em;
+      color: #555;
+      margin-bottom: 8px;
+    }
+    
+    .event-time {
+      font-family: 'Raleway', sans-serif;
+      font-size: 1.3em;
+      color: #333;
+      margin-bottom: 20px;
+      font-weight: 500;
+    }
+    
+    .event-after-party {
+      font-family: 'Raleway', sans-serif;
+      font-size: 1em;
+      color: #555;
+      margin-top: 15px;
+      margin-bottom: 5px;
+    }
+    
+    .event-after-party-time {
+      font-family: 'Raleway', sans-serif;
+      font-size: 1.3em;
+      color: #333;
+      margin-bottom: 20px;
+      font-weight: 500;
+    }
+    
+    .event-venue {
+      font-family: 'Raleway', sans-serif;
+      font-size: 1em;
+      color: #444;
+      margin-bottom: 5px;
+    }
+    
+    .event-location {
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.95em;
+      color: #666;
+      margin-bottom: 20px;
+    }
+    
+    .event-venue-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+    
+    .map-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #f3722b;
+      transition: transform 0.2s, color 0.2s;
+      margin-bottom: 5px;
+    }
+    
+    .map-link:hover {
+      transform: scale(1.15);
+      color: #d45d1a;
+    }
+    
+    .map-link svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+    }
+    
+    .event-attire-label {
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.9em;
+      color: #666;
+      margin-bottom: 5px;
+    }
+    
+    .event-attire {
+      font-family: 'Raleway', sans-serif;
+      font-size: 1em;
+      color: #333;
+    }
+    
+    /* Photo grid */
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-top: 40px;
+    }
+    
+    .photo-grid img {
+      width: 100%;
+      height: 300px;
+      object-fit: cover;
+    }
+    
+    /* Photos Coming Soon styles */
+    .photos-coming-soon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      padding: 20px;
+    }
+    
+    .photos-coming-soon-wrapper {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+    }
+    
+    .photos-coming-soon-wrapper img {
+      display: block;
+      max-width: 100%;
+      max-height: 70vh;
+      width: auto;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    }
+    
+    .coming-soon-banner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-5deg);
+      background: white;
+      padding: 15px 40px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+      white-space: nowrap;
+      border-radius: 10px;
+    }
+    
+    .coming-soon-banner span {
+      font-family: 'Sacramento', cursive;
+      font-size: 3em;
+      color: #f3722b;
+      display: block;
+      text-align: center;
+    }
+    
+    /* Mobile: Photos page fills available space */
+    @media (max-width: 768px) {
+      .photos-page-active .mobile-scroll-container .site-header {
+        display: none;
+      }
+      
+      .photos-page-active .mobile-scroll-container {
+        display: flex !important;
+        flex-direction: column;
+        height: 100%;
+      }
+      
+      .photos-page-active #section-photos {
+        flex: 1;
+        display: flex !important;
+        min-height: 0;
+      }
+      
+      .photos-page-active .photos-coming-soon {
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+        padding: 15px;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .coming-soon-banner {
+        padding: 10px 25px;
+      }
+      
+      .coming-soon-banner span {
+        font-size: 2em;
+      }
+    }
+    
+    /* Registry Coming Soon styles */
+    .registry-coming-soon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 50vh;
+      padding: 40px 20px;
+    }
+    
+    .registry-circle {
+      position: relative;
+      width: 280px;
+      height: 280px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .registry-text {
+      text-align: center;
+      z-index: 1;
+    }
+    
+    .registry-text span {
+      font-family: 'Sacramento', cursive;
+      font-size: 3.5em;
+      color: #1a1a1a;
+      display: block;
+      line-height: 1.1;
+    }
+    
+    .registry-text span:first-child {
+      padding-top: 10px;
+    }
+    
+    .registry-icons-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      animation: registry-spin 20s linear infinite;
+    }
+    
+    @keyframes registry-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    
+    @keyframes registry-counter-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(-360deg); }
+    }
+    
+    .registry-icon-wrapper {
+      position: absolute;
+      width: 36px;
+      height: 36px;
+      top: 50%;
+      left: 50%;
+      margin-left: -18px;
+      margin-top: -18px;
+    }
+    
+    .registry-icon-wrapper:nth-child(1) { transform: rotate(0deg) translateY(-120px); }
+    .registry-icon-wrapper:nth-child(2) { transform: rotate(45deg) translateY(-120px); }
+    .registry-icon-wrapper:nth-child(3) { transform: rotate(90deg) translateY(-120px); }
+    .registry-icon-wrapper:nth-child(4) { transform: rotate(135deg) translateY(-120px); }
+    .registry-icon-wrapper:nth-child(5) { transform: rotate(180deg) translateY(-120px); }
+    .registry-icon-wrapper:nth-child(6) { transform: rotate(225deg) translateY(-120px); }
+    .registry-icon-wrapper:nth-child(7) { transform: rotate(270deg) translateY(-120px); }
+    .registry-icon-wrapper:nth-child(8) { transform: rotate(315deg) translateY(-120px); }
+    
+    .registry-icon {
+      width: 100%;
+      height: 100%;
+      /* Use mask instead of filter for consistent color across iOS/Android */
+      background-color: #f3722b;
+      -webkit-mask-image: var(--icon-src);
+      mask-image: var(--icon-src);
+      -webkit-mask-size: contain;
+      mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      mask-position: center;
+      animation: registry-counter-spin 20s linear infinite;
+    }
+    
+    /* Hide the actual img, show the masked div */
+    .registry-icon-wrapper img.registry-icon {
+      opacity: 0;
+    }
+    
+    .registry-icon-wrapper::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #f3722b;
+      -webkit-mask-size: contain;
+      mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+      -webkit-mask-position: center;
+      mask-position: center;
+      animation: registry-counter-spin 20s linear infinite;
+    }
+    
+    .registry-icon-wrapper:nth-child(1)::before { -webkit-mask-image: url('icons/registry/gift.svg'); mask-image: url('icons/registry/gift.svg'); animation-delay: 0s; }
+    .registry-icon-wrapper:nth-child(2)::before { -webkit-mask-image: url('icons/registry/home.svg'); mask-image: url('icons/registry/home.svg'); animation-delay: -2.5s; }
+    .registry-icon-wrapper:nth-child(3)::before { -webkit-mask-image: url('icons/registry/frying-pan.svg'); mask-image: url('icons/registry/frying-pan.svg'); animation-delay: -5s; }
+    .registry-icon-wrapper:nth-child(4)::before { -webkit-mask-image: url('icons/registry/plates.svg'); mask-image: url('icons/registry/plates.svg'); animation-delay: -7.5s; }
+    .registry-icon-wrapper:nth-child(5)::before { -webkit-mask-image: url('icons/registry/pot-and-lid.svg'); mask-image: url('icons/registry/pot-and-lid.svg'); animation-delay: -10s; }
+    .registry-icon-wrapper:nth-child(6)::before { -webkit-mask-image: url('icons/registry/knife.svg'); mask-image: url('icons/registry/knife.svg'); animation-delay: -12.5s; }
+    .registry-icon-wrapper:nth-child(7)::before { -webkit-mask-image: url('icons/registry/electric-mixer.svg'); mask-image: url('icons/registry/electric-mixer.svg'); animation-delay: -15s; }
+    .registry-icon-wrapper:nth-child(8)::before { -webkit-mask-image: url('icons/registry/sedan.svg'); mask-image: url('icons/registry/sedan.svg'); animation-delay: -17.5s; }
+    
+    /* Animation delays now set in ::before rules above */
+    
+    /* Mobile: Registry page fills available space */
+    @media (max-width: 768px) {
+      .registry-page-active .mobile-scroll-container .site-header {
+        display: none;
+      }
+      
+      .registry-page-active .mobile-scroll-container {
+        display: flex !important;
+        flex-direction: column;
+        height: 100%;
+      }
+      
+      .registry-page-active #section-registry {
+        flex: 1;
+        display: flex !important;
+        min-height: 0;
+      }
+      
+      .registry-page-active .registry-coming-soon {
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+        padding: 20px;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    }
+    
+    /* Q+A FAQ Accordion styles */
+    .qa-container {
+      max-width: 700px;
+      margin: 0 auto;
+      margin-top: 20px;
+    }
+    
+    .qa-item {
+      margin-bottom: 15px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .qa-question {
+      background: #f3722b;
+      color: #fff;
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      font-family: 'Raleway', sans-serif;
+      font-size: 1.05em;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    
+    .qa-question:hover {
+      background: #e5621a;
+    }
+    
+    .qa-icon {
+      font-size: 1.5em;
+      font-weight: 300;
+      margin-right: 15px;
+      transition: transform 0.3s ease;
+      line-height: 1;
+      font-style: normal;
+    }
+    
+    .qa-item.active .qa-icon {
+      transform: rotate(45deg);
+    }
+    
+    .qa-question-text {
+      flex: 1;
+      font-style: italic;
+    }
+    
+    .qa-answer {
+      background: #fde4d6;
+      color: #333;
+      max-height: 0;
+      padding: 0 20px;
+      overflow: hidden;
+      transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out;
+      font-family: 'Raleway', sans-serif;
+      font-size: 1em;
+      line-height: 1.6;
+    }
+    
+    .qa-item.active .qa-answer {
+      max-height: 400px;
+      padding: 20px;
+    }
+    
+    /* Mobile: hide header on Q+A page */
+    @media (max-width: 768px) {
+      .qa-page-active .mobile-scroll-container .site-header {
+        display: none;
+      }
+    }
+    
+    /* Mobile: hide header on Travel page */
+    @media (max-width: 768px) {
+      .travel-page-active .mobile-scroll-container .site-header {
+        display: none;
+      }
+      
+      .travel-page-active .travel-container {
+        padding-top: 30px;
+      }
+    }
+    
+    /* Hotels & Travel page styles */
+    .travel-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding-bottom: 60px;
+    }
+    
+    .travel-section {
+      margin-bottom: 50px;
+    }
+    
+    .travel-section h2 {
+      font-family: 'Bodoni Moda', serif;
+      font-size: 2em;
+      font-weight: 400;
+      color: #1a1a1a;
+      text-align: center;
+      margin-bottom: 15px;
+      letter-spacing: 1px;
+    }
+    
+    .section-subtext {
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.95em;
+      color: #666;
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 30px;
+      line-height: 1.6;
+    }
+    
+    .hotels-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    
+    .hotel-item {
+      background: #fafafa;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      padding: 20px 25px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    
+    .hotel-name-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px;
+    }
+    
+    .hotel-name {
+      font-family: 'Raleway', sans-serif;
+      font-size: 1.1em;
+      font-weight: 500;
+      color: #1a1a1a;
+    }
+    
+    .hotel-walk-time {
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.9em;
+      color: #666;
+      font-style: italic;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .hotel-note {
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.9em;
+      color: #666;
+      font-style: italic;
+      flex: 1;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    
+    .alert-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    
+    .hotel-links {
+      display: flex;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    
+    .hotel-link {
+      font-family: 'Raleway', sans-serif;
+      font-size: 0.9em;
+      color: #f3722b;
+      text-decoration: none;
+      padding: 8px 16px;
+      border: 1px solid #f3722b;
+      border-radius: 20px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    
+    .hotel-link:hover {
+      background: #f3722b;
+      color: white;
+    }
+    
+    .hotel-link.room-block {
+      background: #f3722b;
+      color: white;
+    }
+    
+    .hotel-link.room-block:hover {
+      background: #d45d1a;
+      border-color: #d45d1a;
+    }
+    
+    .travel-info {
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+    }
+    
+    .travel-mode {
+      background: #fafafa;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      padding: 25px;
+    }
+    
+    .travel-mode h3 {
+      font-family: 'Bodoni Moda', serif;
+      font-size: 1.3em;
+      font-weight: 500;
+      color: #1a1a1a;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .travel-icon-container {
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .travel-icon {
+      width: 32px;
+      height: 32px;
+      filter: brightness(0) saturate(100%) invert(48%) sepia(85%) saturate(1703%) hue-rotate(347deg) brightness(98%) contrast(93%);
+    }
+    
+    .travel-icon.plane {
+      width: 38px;
+      height: 38px;
+      animation: plane-fly 3s ease-in-out infinite;
+    }
+    
+    .travel-icon.train {
+      animation: train-chug 0.4s ease-in-out infinite;
+    }
+    
+    @keyframes plane-fly {
+      0%, 100% {
+        transform: translateY(0) rotate(-4deg);
+      }
+      50% {
+        transform: translateY(-7px) rotate(4deg);
+      }
+    }
+    
+    @keyframes train-chug {
+      0%, 100% {
+        transform: translateX(0);
+      }
+      25% {
+        transform: translateX(-1px);
+      }
+      75% {
+        transform: translateX(1px);
+      }
+    }
+    
+    .travel-mode p {
+      font-family: 'Raleway', sans-serif;
+      font-size: 1em;
+      line-height: 1.7;
+      color: #444;
+      margin: 0;
+    }
+    
+    @media (max-width: 768px) {
+      .hotel-item {
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+      }
+      
+      .hotel-note {
+        text-align: left;
+        justify-content: flex-start;
+      }
+      
+      .hotel-links {
+        align-self: flex-start;
+      }
+    }
+    
+    /* Bouncing question mark screensaver */
+    .qa-bouncer-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 1100; /* Above mobile-top-bar (1001) */
+      overflow: hidden;
+      display: none;
+    }
+    
+    .qa-page-active .qa-bouncer-container {
+      display: block;
+    }
+    
+    .qa-bouncer {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      filter: brightness(0) saturate(100%) invert(48%) sepia(85%) saturate(1703%) hue-rotate(347deg) brightness(98%) contrast(93%);
+      opacity: 0.6;
+      left: 100px;
+      top: 100px;
+    }
+    
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      .site-nav {
+        display: none;
+      }
+      
+      .home-hero-image {
+        display: none;
+      }
+      
+      .event-item {
+        margin-bottom: 30px;
+      }
+      
+      .mobile-top-bar {
+        display: block;
+      }
+      
+      /* Mobile countdown shows on mobile */
+      .mobile-countdown {
+        display: flex;
+      }
+      
+      /* Mobile hero photo shows on mobile */
+      .mobile-hero-photo {
+        display: block;
+      }
+      
+      .hamburger {
+        display: block;
+      }
+      
+      .hamburger-click-area {
+        display: block;
+      }
+      
+      .mobile-menu {
+        display: flex;
+      }
+      
+      .site-title {
+        font-size: 3em;
+      }
+      
+      .site-header {
+        padding: 15px 20px 30px; /* Reduced top padding since scroll container handles offset */
+      }
+      
+      .photo-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .photo-grid img {
+        height: 250px;
+      }
+      
+      .page-section h2 {
+        font-size: 1.8em;
+      }
+      
+      /* Hide desktop scroll container on mobile */
+      .desktop-scroll-container {
+        display: none;
+      }
+      
+      /* Mobile: scroll container is a flex item that takes remaining space */
+      .mobile-scroll-container {
+        display: block;
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE/Edge */
+      }
+      
+      .mobile-scroll-container::-webkit-scrollbar {
+        display: none; /* Chrome/Safari/Opera */
+      }
+      
+      /* Mobile: add padding to header inside scroll container */
+      .mobile-scroll-container .site-header {
+        padding-top: 30px;
+      }
+    }
+    
+    .section {
+      margin-bottom: 40px;
+    }
+    
+    .section h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+      font-size: 1.8em;
+      border-bottom: 2px solid #f0f0f0;
+      padding-bottom: 10px;
+    }
+    
+    .section p, .section li {
+      color: #555;
+      line-height: 1.8;
+      font-size: 1.05em;
+    }
+    
+    .venue-info {
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .schedule-item {
+      background: #f9f9f9;
+      padding: 15px 20px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .schedule-item .time {
+      font-weight: bold;
+      color: #667eea;
+      min-width: 100px;
+    }
+    
+    .schedule-item .event {
+      flex: 1;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .schedule-item .location {
+      color: #888;
+      font-style: italic;
+    }
+    
+    .accommodation-item, .registry-item {
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .accommodation-item h3, .registry-item h3 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    
+    .accommodation-item a, .registry-item a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    
+    .accommodation-item a:hover, .registry-item a:hover {
+      text-decoration: underline;
+    }
+    
+    .code {
+      background: #faf9f7;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    
+    @media (max-width: 600px) {
+      .password-page {
+        padding: 40px 20px;
+      }
+      
+      /* main-content should have no padding - it's a flex container */
+      .main-content {
+        padding: 0 !important;
+      }
+      
+      .header h1 {
+        font-size: 2em;
+      }
+      
+      .schedule-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      
+      .schedule-item .time {
+        margin-bottom: 5px;
+      }
+    }
+    
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Video Background (only visible on password page) -->
+  <div class="video-background">
+    <video autoplay muted loop playsinline preload="auto">
+      <source src="disco-ball-shifted.mp4" type="video/mp4">
+    </video>
+  </div>
+  
+  <!-- Password Page -->
+  <div class="container">
+    <div id="passwordPage" class="password-page">
+      <div class="password-input-container">
+        <input 
+          type="text" 
+          id="passwordInput" 
+          class="password-input"
+          placeholder="Enter password"
+          oninput="checkPasswordAsYouType()"
+          onkeydown="if(event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); return false; }"
+        />
+      </div>
+      <div id="errorMessage" class="error-message"></div>
+    </div>
+    
+    <!-- Main Content (hidden until password correct) -->
+    <div id="mainContent" class="main-content">
+      <!-- Content will be dynamically loaded here after decryption -->
+    </div>
+  </div>
+
+  <script>
+    // Mobile video height is now handled by CSS using 100dvh (dynamic viewport height)
+    // This properly handles iOS keyboard open/close without JavaScript manipulation
+    
+    // Encrypted wedding content (generated by build.js)
+    const ENCRYPTED_DATA = '{"salt":"0e43067f20039cbcff51971a477c68b2","iv":"07d6d175f3edd18d7fd31644efa85bdc","authTag":"97860c95c8bd1384fc9f670b9ca02f06","content":"59dbd89fdbf122547ddef4dee0367f57ca784caa89509bb180e71bfcf93d1c30ad29460d7f9d94eedf0936c177a942ead00adf785d8aaa76b1a3ba3907a12f9898693d344af86339b9d68ffdd75889e1b58514bb2a7b7d1e6a9448a8ad72961189e0ff2f2c5c637b7170923e9b6647621bed210194fe3438159f61886fe84d72c298bbbb39517b487588adb1df2b819e3ee3752857ebcca186127ec36efe00b744e2988fde8132f76b6001ae51fa1814c8c44e0ca87b8d86e5f4cf5d96142fd3d30ad77fa57cb2cfb86ec514143349e6c23a28031fa45e61e72c34d9a2024e321c7bbcf42147113ed7a7eae53266df116acb980aceb1f56110429898cddb03b019b5afff56d727af33c751edd75e635f10bfd982718825a20128d618de0f491d0b15a7cee614467aae7653e733af18167f637595c83e0fc28e7b8c345f21032998c0f139e4fd2db654ee2d10dc786f8be43ab64c8feaa5b28782282cdb5c8595b825fa8108d3fadc6cc3ca4ace237ae21b940be45071365909f889477e5c5e906eb9b1edf541700adc0ff2fe6e4e28dbc7b8bc55deff652a777ef7f5de745eac9fa068561a3badfbbaf2e8f7f4e09d12cb7bb81820a35a39784ec65ea50ca2747d5fd3db987931c81802fe0bd33ad4b3692dcfeade2d669dfe776fe57febbd7bf7f57aa40d6f264327c1f5046b56b67a9b4fe605a89a1b5865acd243b7064d19607946ccd07beb9b294a7b913b63971ce1c458ee87bbefb71eb4b2d03c603ad074b9e9c923f7a7e64cf63266dbdc4ff3dad8c9a4ce492cffa5a3fa2bd1d864385005dbed89db68f679024a5b613a51fca42a5546f6d4471df2725cd6a190f446ffc2f6a703368798eab3fb890c97aae1500bda6a0deca30bf9bffed15ce37143f6a64cef47e0aef71f828c5b944fe8cf8535ce44be6254ef839985c3697a1252ede0f634b529742fb4d5adfba5e53e0f5f9fd757dde80d594f0d80758c19c76648d7fe43b4ec7933b718c158eb084953be6866e897da314092ffbd9c8b75f07ff4c9de8771da53e410251413962913341b0abee91d385b2c2ee2a6905b02d85bfc5e6e1389a422693ff433e89ffd7a73bd7bb2c26ce36983678169674e969fc32ed5796b6b9ade2112272bfbf4372b664038f88947824436143b04a3eea393ce189f49272481821bff2b15f813b3c96132d9606019efb56055efc9680d11c4ea60a16afc1c50cc2caf1dffc3229bdd80e4c1310dc6d61b4677fea3c8d6efde49d7c01a1995cb5a518763a46764131da5b9230622b4d2d8200e5f1a4e1f5d7bc20411180fbe636ae350e95617b21c26e66b00c1899506a89db318fb3c21a698a5f3a37e64f6dce5d650b848cbcae5a6944dd2c3713134dcfb29fe24157f9feec10cb52c6db74ec961a979afa65d5c0a17d786b1b3c88b67472ff49846ab2ba7b5a18d88d9abe229ddb319ff7be860f3bab1fce517fcfd96667e3ec5e872d64da69b6fcea291f805d219"}';
+    
+    // Decrypt function using Web Crypto API
+    async function decryptContent(password, encryptedPayload) {
+      try {
+        const { salt, iv, authTag, content } = JSON.parse(encryptedPayload);
+        
+        // Convert hex strings back to bytes
+        const saltBytes = hexToBytes(salt);
+        const ivBytes = hexToBytes(iv);
+        const authTagBytes = hexToBytes(authTag);
+        const contentBytes = hexToBytes(content);
+        
+        // Derive key from password using PBKDF2
+        const enc = new TextEncoder();
+        const passwordKey = await crypto.subtle.importKey(
+          'raw',
+          enc.encode(password),
+          'PBKDF2',
+          false,
+          ['deriveBits']
+        );
+        
+        const derivedBits = await crypto.subtle.deriveBits(
+          {
+            name: 'PBKDF2',
+            salt: saltBytes,
+            iterations: 100000,
+            hash: 'SHA-256'
+          },
+          passwordKey,
+          256
+        );
+        
+        const key = await crypto.subtle.importKey(
+          'raw',
+          derivedBits,
+          'AES-GCM',
+          false,
+          ['decrypt']
+        );
+        
+        // Combine content and auth tag for GCM
+        const combined = new Uint8Array(contentBytes.length + authTagBytes.length);
+        combined.set(contentBytes);
+        combined.set(authTagBytes, contentBytes.length);
+        
+        // Decrypt
+        const decrypted = await crypto.subtle.decrypt(
+          {
+            name: 'AES-GCM',
+            iv: ivBytes,
+            tagLength: 128
+          },
+          key,
+          combined
+        );
+        
+        const dec = new TextDecoder();
+        return dec.decode(decrypted);
+      } catch (error) {
+        return null;
+      }
+    }
+    
+    function hexToBytes(hex) {
+      const bytes = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < hex.length; i += 2) {
+        bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+      }
+      return bytes;
+    }
+    
+    // Debounce timer for auto-checking password as user types
+    let passwordCheckTimer = null;
+    
+    async function checkPasswordAsYouType() {
+      const errorMsg = document.getElementById('errorMessage');
+      errorMsg.textContent = ''; // Clear error message while typing
+      
+      // Clear previous timer
+      if (passwordCheckTimer) {
+        clearTimeout(passwordCheckTimer);
+      }
+      
+      // Wait 300ms after user stops typing before checking
+      passwordCheckTimer = setTimeout(async () => {
+        await checkPassword();
+      }, 300);
+    }
+    
+    async function checkPassword() {
+      const passwordInput = document.getElementById('passwordInput');
+      const password = passwordInput.value.toLowerCase();
+      const errorMsg = document.getElementById('errorMessage');
+      
+      // Don't check if input is disabled (already granted access)
+      if (passwordInput.disabled) {
+        return;
+      }
+      
+      if (!password) {
+        return;
+      }
+      
+      const decryptedContent = await decryptContent(password, ENCRYPTED_DATA);
+      
+      if (decryptedContent) {
+        // Success! Show "Welcome!" in green
+        const passwordInput = document.getElementById('passwordInput');
+        passwordInput.type = 'text';
+        passwordInput.value = 'Welcome!';
+        passwordInput.classList.add('granted');
+        passwordInput.disabled = true;
+        
+        // Close keyboard and scroll back to top first
+        passwordInput.blur();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        // Wait for keyboard to close and scroll to complete, then fade
+        setTimeout(async () => {
+          try {
+            const data = JSON.parse(decryptedContent);
+            displayContent(data);
+            
+            // Load correct section based on current URL or redirect from 404
+            let path = sessionStorage.getItem('redirect');
+            if (path) {
+              sessionStorage.removeItem('redirect');
+            } else {
+              path = window.location.pathname;
+            }
+            // Extract section ID from path (handle both /photos and /wedding/photos)
+            const pathParts = path.split('/').filter(p => p);
+            // Filter out 'wedding' base path if present
+            const filteredParts = pathParts.filter(p => p !== 'wedding');
+            const sectionId = filteredParts.length === 0 ? 'home' : filteredParts[filteredParts.length - 1];
+            // Always show the appropriate section (including home)
+            if (sectionId !== 'home') {
+              showSectionFromUrl(sectionId);
+            }
+            // Home section is already active by default in the HTML
+            
+            // Show main content immediately (it's behind video, will be revealed as video fades)
+            const mainContent = document.getElementById('mainContent');
+            mainContent.classList.add('shown');
+            
+            // Fade out password box
+            document.getElementById('passwordPage').classList.add('hidden');
+            
+            // Fade out video (content is already visible behind it)
+            document.body.classList.add('content-visible');
+            
+            // Forward touch events from video to scroll container during fade
+            const videoBackground = document.querySelector('.video-background');
+            const scrollContainer = document.querySelector('.mobile-scroll-container');
+            if (videoBackground && scrollContainer) {
+              // Allow touch events to reach content by making video non-interactive
+              videoBackground.style.pointerEvents = 'none';
+              
+              // For iOS: also forward touch events manually
+              const forwardTouch = (e) => {
+                const touch = e.touches[0];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (target && target !== videoBackground) {
+                  // Event will naturally go to the element below since pointer-events: none
+                }
+              };
+              videoBackground.addEventListener('touchstart', forwardTouch, { passive: true });
+              videoBackground.addEventListener('touchmove', forwardTouch, { passive: true });
+            }
+            
+            // Remove video from DOM at 1.5s (ease-in means it's mostly faded by then)
+            setTimeout(() => {
+              if (videoBackground) {
+                videoBackground.remove();
+              }
+            }, 1500);
+            
+            // Store success in session (not password)
+            sessionStorage.setItem('authenticated', 'true');
+          } catch (error) {
+            console.error('Error loading content:', error);
+            errorMsg.textContent = 'Error loading content: ' + error.message;
+          }
+        }, 800);
+      } else {
+        // Only show error if password seems substantial (likely complete)
+        // But don't show error if input is already disabled (access granted)
+        if (password.length >= 8 && !passwordInput.disabled) {
+          errorMsg.textContent = 'Incorrect password';
+          // Clear after showing error briefly
+          setTimeout(() => {
+            document.getElementById('passwordInput').value = '';
+            errorMsg.textContent = '';
+            document.getElementById('passwordInput').focus();
+          }, 1500);
+        }
+      }
+    }
+    
+    function displayContent(data) {
+      const content = document.getElementById('mainContent');
+      
+      // Generate events HTML
+      let eventsHTML = '';
+      if (data.events && data.events.length > 0) {
+        eventsHTML = data.events.map(event => `
+          <div class="event-item">
+            <div class="event-title">${event.title}</div>
+            <div class="event-date">${event.date}</div>
+            <div class="event-time">${event.time}</div>
+            ${event.afterParty ? `
+              <div class="event-after-party">${event.afterParty.text}</div>
+              <div class="event-after-party-time">${event.afterParty.time}</div>
+            ` : ''}
+            <div class="event-venue-row">
+              <span class="event-venue">${event.venue}</span>
+              ${event.mapLink 
+                ? `<a href="${event.mapLink}" target="_blank" rel="noopener noreferrer" class="map-link" aria-label="Open in Google Maps">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                  </a>`
+                : ''
+              }
+            </div>
+            <div class="event-location">${event.location}</div>
+            <div class="event-attire-label">Attire: ${event.attire}</div>
+            ${event.attireNote ? `<div class="event-attire">${event.attireNote}</div>` : ''}
+          </div>
+        `).join('');
+      }
+      
+      const sectionsHTML = `
+        <!-- Home Section -->
+        <section class="page-section active" id="section-home">
+          <img src="orange_trees.jpg" alt="Orange Trees" class="home-hero-image">
+          <div class="events-list">
+            ${eventsHTML}
+          </div>
+        </section>
+        
+        <!-- Photos Section -->
+        <section class="page-section" id="section-photos">
+          <div class="photos-coming-soon">
+            <div class="photos-coming-soon-wrapper">
+              <img src="temp_photo.jpg" alt="Coming Soon">
+              <div class="coming-soon-banner">
+                <span>Coming Soon</span>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Q+A Section -->
+        <section class="page-section" id="section-qa">
+          <div class="qa-container">
+            <div class="qa-item">
+              <div class="qa-question" onclick="toggleQA(this)">
+                <span class="qa-icon">+</span>
+                <span class="qa-question-text">What is the dress code for the wedding ceremony and reception?</span>
+              </div>
+              <div class="qa-answer">
+                The dress code is black tie. This means that men should wear tuxedos and women should wear floor-length dresses or jumpsuits. We welcome and encourage: sequins, colors, and anything that captures the celebratory spirit of the evening. Finally, we request that guests avoid wearing the color white (silver sequins are okay!).
+              </div>
+            </div>
+            <div class="qa-item">
+              <div class="qa-question" onclick="toggleQA(this)">
+                <span class="qa-icon">+</span>
+                <span class="qa-question-text">Are children welcome?</span>
+              </div>
+              <div class="qa-answer">
+                While we love your little ones, our ceremony and reception will be an adults-only (21+) affair to align with the late-night New Year's Eve festivities. We hope you understand and enjoy the night off to celebrate in style!
+              </div>
+            </div>
+            <div class="qa-item">
+              <div class="qa-question" onclick="toggleQA(this)">
+                <span class="qa-icon">+</span>
+                <span class="qa-question-text">Can I bring a guest?</span>
+              </div>
+              <div class="qa-answer">
+                While we would love to celebrate with everyone, our guest list is limited to those specifically addressed on your invitation. Please contact Nolan or Meghan if you would like to protest this policy.
+              </div>
+            </div>
+            <div class="qa-item">
+              <div class="qa-question" onclick="toggleQA(this)">
+                <span class="qa-icon">+</span>
+                <span class="qa-question-text">Is there parking for the ceremony and reception?</span>
+              </div>
+              <div class="qa-answer">
+                We are working to figure this out. Likely yes, but check back closer to the event for a final answer.
+              </div>
+            </div>
+            <div class="qa-item">
+              <div class="qa-question" onclick="toggleQA(this)">
+                <span class="qa-icon">+</span>
+                <span class="qa-question-text">Will there be transportation provided between the ceremony and reception?</span>
+              </div>
+              <div class="qa-answer">
+                Arlington Street Church is located on the same block as the Newbury, a 1-2 minute walk, so transportation will not be provided. We realize that not all of you are Olympic athletes so if this may be an issue please let us know!
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Travel Section -->
+        <section class="page-section" id="section-travel">
+          <div class="travel-container">
+            <div class="travel-section">
+              <h2>Hotels</h2>
+              <p class="section-subtext">We have reserved two room blocks, you can find the booking links below as well as additional options. Please text Meghan or Nolan if you have any questions or issues.</p>
+              <div class="hotels-list">
+                <div class="hotel-item">
+                  <div class="hotel-name-row">
+                    <span class="hotel-name">The Newbury Boston</span>
+                    <span class="hotel-walk-time">The wedding venue! (~0 min. walk)</span>
+                  </div>
+                  <div class="hotel-links">
+                    <a href="https://book.passkey.com/event/51077363/owner/50024227/home" target="_blank" rel="noopener noreferrer" class="hotel-link room-block">Book Room Block</a>
+                    <a href="https://maps.app.goo.gl/HweK2q2Zr8qr7QeL6" target="_blank" rel="noopener noreferrer" class="hotel-link">View on Map</a>
+                  </div>
+                </div>
+                <div class="hotel-item">
+                  <div class="hotel-name-row">
+                    <span class="hotel-name">Hilton Boston Park Plaza</span>
+                    <span class="hotel-walk-time">(~4 min. walk)</span>
+                  </div>
+                  <div class="hotel-links">
+                    <a href="https://book.passkey.com/e/51189689" target="_blank" rel="noopener noreferrer" class="hotel-link room-block">Book Room Block</a>
+                    <a href="https://maps.app.goo.gl/RHAB8psEcVnuiM589" target="_blank" rel="noopener noreferrer" class="hotel-link">View on Map</a>
+                  </div>
+                </div>
+                <div class="hotel-item">
+                  <div class="hotel-name-row">
+                    <span class="hotel-name">Four Seasons Boston</span>
+                    <span class="hotel-walk-time">(~5 min. walk)</span>
+                  </div>
+                  <div class="hotel-links">
+                    <a href="https://www.fourseasons.com/boston/" target="_blank" rel="noopener noreferrer" class="hotel-link">Website</a>
+                    <a href="https://maps.app.goo.gl/D7YisFzCuLRWH4Ti8" target="_blank" rel="noopener noreferrer" class="hotel-link">View on Map</a>
+                  </div>
+                </div>
+                <div class="hotel-item">
+                  <div class="hotel-name-row">
+                    <span class="hotel-name">Hotel AKA Back Bay</span>
+                    <span class="hotel-walk-time">(~8 min. walk)</span>
+                  </div>
+                  <div class="hotel-links">
+                    <a href="https://www.stayaka.com/locations/boston" target="_blank" rel="noopener noreferrer" class="hotel-link">Website</a>
+                    <a href="https://www.google.com/maps?q=Hotel+AKA+Back+Bay,+154+Berkeley+St,+Boston,+MA+02116" target="_blank" rel="noopener noreferrer" class="hotel-link">View on Map</a>
+                  </div>
+                </div>
+                <div class="hotel-item">
+                  <div class="hotel-name-row">
+                    <span class="hotel-name">W Boston</span>
+                    <span class="hotel-walk-time">(~11 min. walk)</span>
+                  </div>
+                  <div class="hotel-links">
+                    <a href="https://www.marriott.com/en-us/hotels/boswh-w-boston/" target="_blank" rel="noopener noreferrer" class="hotel-link">Website</a>
+                    <a href="https://maps.app.goo.gl/5w9rocTUL5XbAZ4e8" target="_blank" rel="noopener noreferrer" class="hotel-link">View on Map</a>
+                  </div>
+                </div>
+                <div class="hotel-item">
+                  <div class="hotel-name-row">
+                    <span class="hotel-name">The Revolution Hotel</span>
+                    <span class="hotel-walk-time">(~13 min. walk)</span>
+                  </div>
+                  <div class="hotel-links">
+                    <a href="https://www.therevolutionhotel.com/" target="_blank" rel="noopener noreferrer" class="hotel-link">Website</a>
+                    <a href="https://maps.app.goo.gl/p9hGb1KiwWCMr8cg6" target="_blank" rel="noopener noreferrer" class="hotel-link">View on Map</a>
+                  </div>
+                </div>
+                <div class="hotel-item">
+                  <div class="hotel-name-row">
+                    <span class="hotel-name">Boston Marriott Copley Place</span>
+                    <span class="hotel-walk-time">(~17 min. walk)</span>
+                  </div>
+                  <div class="hotel-links">
+                    <a href="https://www.marriott.com/en-us/hotels/bosco-boston-marriott-copley-place/" target="_blank" rel="noopener noreferrer" class="hotel-link">Website</a>
+                    <a href="https://maps.app.goo.gl/H742ucT8Uhq1gq126" target="_blank" rel="noopener noreferrer" class="hotel-link">View on Map</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="travel-section">
+              <h2>Travel</h2>
+              <div class="travel-info">
+                <div class="travel-mode">
+                  <h3><div class="travel-icon-container"><img src="icons/airplane.svg" alt="" class="travel-icon plane"></div>By Plane</h3>
+                  <p>Fly into <strong>Boston Logan International Airport (BOS)</strong>. From there, you can take a taxi, rideshare, or the MBTA to downtown Boston. The Newbury Boston is about 15-20 minutes from the airport by car, depending on traffic.</p>
+                </div>
+                <div class="travel-mode">
+                  <h3><div class="travel-icon-container"><img src="icons/train.svg" alt="" class="travel-icon train"></div>By Train</h3>
+                  <p>Take <strong>Amtrak</strong> to either <strong>Back Bay Station</strong> or <strong>South Station</strong>. Back Bay Station is about a 15-minute walk to The Newbury Boston, while South Station is about a 20-minute walk. Pick the station that's closest to your hotel!</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Things to Do Section -->
+        <section class="page-section" id="section-things">
+          <h2>Things to Do</h2>
+          <p>Our favorite spots and activities in Boston.</p>
+        </section>
+        
+        <!-- RSVP Section -->
+        <section class="page-section" id="section-rsvp">
+          <h2>RSVP</h2>
+          <p>Coming soon.</p>
+        </section>
+        
+        <!-- Registry Section -->
+        <section class="page-section" id="section-registry">
+          <div class="registry-coming-soon">
+            <div class="registry-circle">
+              <div class="registry-text">
+                <span>Coming</span>
+                <span>Soon!</span>
+              </div>
+              <div class="registry-icons-ring">
+                <div class="registry-icon-wrapper"><img src="icons/registry/gift.svg" alt="" class="registry-icon"></div>
+                <div class="registry-icon-wrapper"><img src="icons/registry/home.svg" alt="" class="registry-icon"></div>
+                <div class="registry-icon-wrapper"><img src="icons/registry/frying-pan.svg" alt="" class="registry-icon"></div>
+                <div class="registry-icon-wrapper"><img src="icons/registry/plates.svg" alt="" class="registry-icon"></div>
+                <div class="registry-icon-wrapper"><img src="icons/registry/pot-and-lid.svg" alt="" class="registry-icon"></div>
+                <div class="registry-icon-wrapper"><img src="icons/registry/knife.svg" alt="" class="registry-icon"></div>
+                <div class="registry-icon-wrapper"><img src="icons/registry/electric-mixer.svg" alt="" class="registry-icon"></div>
+                <div class="registry-icon-wrapper"><img src="icons/registry/sedan.svg" alt="" class="registry-icon"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+      
+      content.innerHTML = `
+        <!-- Bouncing question mark for Q+A page -->
+        <div class="qa-bouncer-container" id="qaBouncerContainer">
+          <img src="icons/question-mark.svg" alt="" class="qa-bouncer" id="qaBouncer">
+        </div>
+        
+        <!-- Desktop vertical icon scrollers -->
+        <div class="desktop-icon-scroller left">
+          <div class="desktop-icon-track">
+            <img src="icons/rings.svg" alt="">
+            <img src="icons/champagne-glasses.svg" alt="">
+            <img src="icons/wedding-cake.svg" alt="">
+            <img src="icons/bride-groom.svg" alt="">
+            <img src="icons/disco-ball.svg" alt="">
+            <img src="icons/dance.svg" alt="">
+            <img src="icons/dj.svg" alt="">
+            <img src="icons/champagne-bottle.svg" alt="">
+            <img src="icons/rings.svg" alt="">
+            <img src="icons/champagne-glasses.svg" alt="">
+            <img src="icons/wedding-cake.svg" alt="">
+            <img src="icons/bride-groom.svg" alt="">
+            <img src="icons/disco-ball.svg" alt="">
+            <img src="icons/dance.svg" alt="">
+            <img src="icons/dj.svg" alt="">
+            <img src="icons/champagne-bottle.svg" alt="">
+            <img src="icons/rings.svg" alt="">
+            <img src="icons/champagne-glasses.svg" alt="">
+            <img src="icons/wedding-cake.svg" alt="">
+            <img src="icons/bride-groom.svg" alt="">
+            <img src="icons/disco-ball.svg" alt="">
+            <img src="icons/dance.svg" alt="">
+            <img src="icons/dj.svg" alt="">
+            <img src="icons/champagne-bottle.svg" alt="">
+            <img src="icons/rings.svg" alt="">
+            <img src="icons/champagne-glasses.svg" alt="">
+            <img src="icons/wedding-cake.svg" alt="">
+            <img src="icons/bride-groom.svg" alt="">
+            <img src="icons/disco-ball.svg" alt="">
+            <img src="icons/dance.svg" alt="">
+            <img src="icons/dj.svg" alt="">
+            <img src="icons/champagne-bottle.svg" alt="">
+          </div>
+        </div>
+        <div class="desktop-icon-scroller right">
+          <div class="desktop-icon-track-reverse">
+            <img src="icons/champagne-bottle.svg" alt="">
+            <img src="icons/dj.svg" alt="">
+            <img src="icons/dance.svg" alt="">
+            <img src="icons/disco-ball.svg" alt="">
+            <img src="icons/bride-groom.svg" alt="">
+            <img src="icons/wedding-cake.svg" alt="">
+            <img src="icons/champagne-glasses.svg" alt="">
+            <img src="icons/rings.svg" alt="">
+            <img src="icons/champagne-bottle.svg" alt="">
+            <img src="icons/dj.svg" alt="">
+            <img src="icons/dance.svg" alt="">
+            <img src="icons/disco-ball.svg" alt="">
+            <img src="icons/bride-groom.svg" alt="">
+            <img src="icons/wedding-cake.svg" alt="">
+            <img src="icons/champagne-glasses.svg" alt="">
+            <img src="icons/rings.svg" alt="">
+            <img src="icons/champagne-bottle.svg" alt="">
+            <img src="icons/dj.svg" alt="">
+            <img src="icons/dance.svg" alt="">
+            <img src="icons/disco-ball.svg" alt="">
+            <img src="icons/bride-groom.svg" alt="">
+            <img src="icons/wedding-cake.svg" alt="">
+            <img src="icons/champagne-glasses.svg" alt="">
+            <img src="icons/rings.svg" alt="">
+            <img src="icons/champagne-bottle.svg" alt="">
+            <img src="icons/dj.svg" alt="">
+            <img src="icons/dance.svg" alt="">
+            <img src="icons/disco-ball.svg" alt="">
+            <img src="icons/bride-groom.svg" alt="">
+            <img src="icons/wedding-cake.svg" alt="">
+            <img src="icons/champagne-glasses.svg" alt="">
+            <img src="icons/rings.svg" alt="">
+          </div>
+        </div>
+        
+        <!-- DESKTOP: One big scrollable container -->
+        <div class="desktop-scroll-container">
+          <header class="site-header">
+            <h1 class="site-title">MEGHAN <span class="ampersand">&</span> NOLAN</h1>
+            <p class="site-date">December 31, 2026 <span style="color: #f3722b;">✦</span> Boston, Massachusetts</p>
+          </header>
+          <nav class="site-nav">
+            <a href="/" onclick="showSection('home'); return false;" class="active">Home</a>
+            <a href="/travel" onclick="showSection('travel'); return false;">Hotels & Travel</a>
+            <a href="/photos" onclick="showSection('photos'); return false;">Photos</a>
+            <a href="/registry" onclick="showSection('registry'); return false;">Registry</a>
+            <a href="/qa" onclick="showSection('qa'); return false;">Q + A</a>
+            <!-- <a href="/things" onclick="showSection('things'); return false;">Things to Do</a> -->
+            <!-- <a href="/rsvp" onclick="showSection('rsvp'); return false;">RSVP</a> -->
+          </nav>
+          <div class="desktop-sections">
+            ${sectionsHTML}
+          </div>
+        </div>
+        
+        <!-- MOBILE: Title bar + scrollable content in flex layout -->
+        <div class="mobile-top-bar">
+          <div class="hamburger-click-area" onclick="toggleMobileMenu()"></div>
+          <button class="hamburger" onclick="toggleMobileMenu()">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <span class="mobile-top-bar-title" id="mobilePageTitle">M & N</span>
+        </div>
+        
+        <div class="mobile-menu" id="mobileMenu">
+          <nav>
+            <a href="/" onclick="showSection('home'); return false;" class="active">Home</a>
+            <a href="/travel" onclick="showSection('travel'); return false;">Hotels & Travel</a>
+            <a href="/photos" onclick="showSection('photos'); return false;">Photos</a>
+            <a href="/registry" onclick="showSection('registry'); return false;">Registry</a>
+            <a href="/qa" onclick="showSection('qa'); return false;">Q + A</a>
+          </nav>
+          <div class="menu-icon-scroller-top">
+            <div class="icon-track-reverse">
+              <img src="icons/champagne-bottle.svg" alt="bottle">
+              <img src="icons/dj.svg" alt="dj">
+              <img src="icons/dance.svg" alt="dance">
+              <img src="icons/disco-ball.svg" alt="disco">
+              <img src="icons/bride-groom.svg" alt="bride and groom">
+              <img src="icons/wedding-cake.svg" alt="cake">
+              <img src="icons/champagne-glasses.svg" alt="champagne">
+              <img src="icons/rings.svg" alt="rings">
+              <img src="icons/champagne-bottle.svg" alt="bottle">
+              <img src="icons/dj.svg" alt="dj">
+              <img src="icons/dance.svg" alt="dance">
+              <img src="icons/disco-ball.svg" alt="disco">
+              <img src="icons/bride-groom.svg" alt="bride and groom">
+              <img src="icons/wedding-cake.svg" alt="cake">
+              <img src="icons/champagne-glasses.svg" alt="champagne">
+              <img src="icons/rings.svg" alt="rings">
+            </div>
+          </div>
+          <div class="menu-icon-scroller">
+            <div class="icon-track">
+              <img src="icons/rings.svg" alt="rings">
+              <img src="icons/champagne-glasses.svg" alt="champagne">
+              <img src="icons/wedding-cake.svg" alt="cake">
+              <img src="icons/bride-groom.svg" alt="bride and groom">
+              <img src="icons/disco-ball.svg" alt="disco">
+              <img src="icons/dance.svg" alt="dance">
+              <img src="icons/dj.svg" alt="dj">
+              <img src="icons/champagne-bottle.svg" alt="bottle">
+              <img src="icons/rings.svg" alt="rings">
+              <img src="icons/champagne-glasses.svg" alt="champagne">
+              <img src="icons/wedding-cake.svg" alt="cake">
+              <img src="icons/bride-groom.svg" alt="bride and groom">
+              <img src="icons/disco-ball.svg" alt="disco">
+              <img src="icons/dance.svg" alt="dance">
+              <img src="icons/dj.svg" alt="dj">
+              <img src="icons/champagne-bottle.svg" alt="bottle">
+            </div>
+          </div>
+        </div>
+        
+        <div class="mobile-scroll-container">
+          <!-- MOBILE: Countdown timer (only on home page) -->
+          <div class="mobile-countdown">
+            <span class="countdown-label-left">NYE 2026:</span>
+            <div class="countdown-timer">
+              <div class="countdown-unit">
+                <span class="countdown-number" id="days">000</span>
+                <span class="countdown-label">Days</span>
+              </div>
+              <div class="countdown-unit">
+                <span class="countdown-number" id="hours">00</span>
+                <span class="countdown-label">Hours</span>
+              </div>
+              <div class="countdown-unit">
+                <span class="countdown-number" id="minutes">00</span>
+                <span class="countdown-label">Min</span>
+              </div>
+              <div class="countdown-unit">
+                <span class="countdown-number" id="seconds">00</span>
+                <span class="countdown-label">Sec</span>
+              </div>
+            </div>
+          </div>
+          <!-- MOBILE: Hero photo (only on home page) -->
+          <div class="mobile-hero-photo">
+            <img src="orange_trees.jpg" alt="Orange Trees">
+          </div>
+          <header class="site-header">
+            <h1 class="site-title">MEGHAN <span class="ampersand">&</span> NOLAN</h1>
+            <div class="site-date-mobile">
+              <span class="date-line">December 31, 2026</span>
+              <span class="date-divider"></span>
+              <span class="location-line">Boston, Massachusetts</span>
+            </div>
+          </header>
+          <div class="mobile-sections">
+            ${sectionsHTML}
+          </div>
+        </div>
+      `;
+      
+      // Start countdown timer
+      startCountdown();
+    }
+    
+    // Countdown timer to December 31, 2026 at midnight ET
+    function startCountdown() {
+      function updateCountdown() {
+        // Target date: December 31, 2026, 00:00:00 ET (UTC-5)
+        const targetDate = new Date('2026-12-31T00:00:00-05:00');
+        const now = new Date();
+        const diff = targetDate - now;
+        
+        if (diff <= 0) {
+          // Event has passed
+          document.getElementById('days').textContent = '000';
+          document.getElementById('hours').textContent = '00';
+          document.getElementById('minutes').textContent = '00';
+          document.getElementById('seconds').textContent = '00';
+          return;
+        }
+        
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        document.getElementById('days').textContent = String(days).padStart(3, '0');
+        document.getElementById('hours').textContent = String(hours).padStart(2, '0');
+        document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
+        document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
+      }
+      
+      // Update immediately and then every second
+      updateCountdown();
+      setInterval(updateCountdown, 1000);
+    }
+    
+    // Get base path (e.g., '/wedding' for GitHub Pages or '' for root domain)
+    function getBasePath() {
+      const path = window.location.pathname;
+      const parts = path.split('/').filter(p => p);
+      // If first part is 'wedding' (repo name), use it as base
+      if (parts.length > 0 && parts[0] === 'wedding') {
+        return '/wedding';
+      }
+      return '';
+    }
+    
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobileMenu');
+      const hamburger = document.querySelector('.hamburger');
+      menu.classList.toggle('active');
+      hamburger.classList.toggle('active');
+    }
+    
+    // Force-restart registry animations to fix iOS sync issue
+    function restartRegistryAnimations() {
+      const ring = document.querySelector('.registry-icons-ring');
+      const wrappers = document.querySelectorAll('.registry-icon-wrapper');
+      if (ring) {
+        // Briefly remove animation, force reflow, then restore
+        ring.style.animation = 'none';
+        wrappers.forEach(w => w.style.animation = 'none');
+        void ring.offsetWidth; // Force reflow
+        ring.style.animation = '';
+        wrappers.forEach(w => w.style.animation = '');
+      }
+    }
+    
+    function toggleQA(element) {
+      const qaItem = element.parentElement;
+      qaItem.classList.toggle('active');
+    }
+    
+    // Bouncing question mark screensaver
+    let bouncerX = 100, bouncerY = 100;
+    let bouncerDX = 1.2, bouncerDY = 0.9;
+    let bouncerAnimationId = null;
+    
+    function animateBouncer() {
+      const bouncer = document.getElementById('qaBouncer');
+      
+      if (!bouncer) {
+        bouncerAnimationId = requestAnimationFrame(animateBouncer);
+        return;
+      }
+      
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      const bouncerWidth = 60;
+      const bouncerHeight = 60;
+      
+      bouncerX += bouncerDX;
+      bouncerY += bouncerDY;
+      
+      // Bounce off edges - use screen dimensions
+      if (bouncerX <= 0) {
+        bouncerDX = Math.abs(bouncerDX);
+        bouncerX = 0;
+      } else if (bouncerX + bouncerWidth >= screenWidth) {
+        bouncerDX = -Math.abs(bouncerDX);
+        bouncerX = screenWidth - bouncerWidth;
+      }
+      
+      if (bouncerY <= 0) {
+        bouncerDY = Math.abs(bouncerDY);
+        bouncerY = 0;
+      } else if (bouncerY + bouncerHeight >= screenHeight) {
+        bouncerDY = -Math.abs(bouncerDY);
+        bouncerY = screenHeight - bouncerHeight;
+      }
+      
+      bouncer.style.left = bouncerX + 'px';
+      bouncer.style.top = bouncerY + 'px';
+      
+      bouncerAnimationId = requestAnimationFrame(animateBouncer);
+    }
+    
+    // Start bouncer when Q+A section is shown
+    function startBouncer() {
+      if (!bouncerAnimationId) {
+        // Reset position to center-ish
+        bouncerX = window.innerWidth / 3;
+        bouncerY = window.innerHeight / 3;
+        bouncerAnimationId = requestAnimationFrame(animateBouncer);
+      }
+    }
+    
+    function stopBouncer() {
+      if (bouncerAnimationId) {
+        cancelAnimationFrame(bouncerAnimationId);
+        bouncerAnimationId = null;
+      }
+    }
+    
+    function showSection(sectionId) {
+      // Section title mapping
+      const titles = {
+        'home': 'M & N',
+        'photos': 'Photos',
+        'qa': 'Q + A',
+        'travel': 'Hotels & Travel',
+        'things': 'Things to Do',
+        'rsvp': 'RSVP',
+        'registry': 'Our Registry'
+      };
+      
+      // Hide all sections
+      document.querySelectorAll('.page-section').forEach(section => {
+        section.classList.remove('active');
+      });
+      
+      // Show selected section in both desktop and mobile containers
+      document.querySelectorAll('#section-' + sectionId).forEach(section => {
+        section.classList.add('active');
+      });
+      
+      // Update nav active state (both desktop and mobile)
+      document.querySelectorAll('.site-nav a, .mobile-menu nav a').forEach(link => {
+        link.classList.remove('active');
+      });
+      
+      // Add active to links that match the current section
+      const sectionPath = sectionId === 'home' ? '/' : '/' + sectionId;
+      document.querySelectorAll('.site-nav a, .mobile-menu nav a').forEach(link => {
+        const href = link.getAttribute('href');
+        if ((href === '/' && sectionId === 'home') || href === sectionPath) {
+          link.classList.add('active');
+        }
+      });
+      
+      // Update mobile top bar title
+      const mobileTitle = document.getElementById('mobilePageTitle');
+      if (mobileTitle && titles[sectionId]) {
+        mobileTitle.textContent = titles[sectionId];
+      }
+      
+      // Show/hide countdown and hero photo on mobile (only on home page)
+      const countdown = document.querySelector('.mobile-countdown');
+      const heroPhoto = document.querySelector('.mobile-hero-photo');
+      if (countdown) {
+        countdown.style.display = sectionId === 'home' ? 'flex' : 'none';
+      }
+      if (heroPhoto) {
+        heroPhoto.style.display = sectionId === 'home' ? 'block' : 'none';
+      }
+      
+      // Toggle page-specific classes for mobile header hiding
+      const mainContent = document.getElementById('mainContent');
+      if (mainContent) {
+        // Photos page
+        if (sectionId === 'photos') {
+          mainContent.classList.add('photos-page-active');
+        } else {
+          mainContent.classList.remove('photos-page-active');
+        }
+        // Registry page
+        if (sectionId === 'registry') {
+          mainContent.classList.add('registry-page-active');
+          // Force-restart animations to fix iOS sync issue
+          restartRegistryAnimations();
+        } else {
+          mainContent.classList.remove('registry-page-active');
+        }
+        // Q+A page
+        if (sectionId === 'qa') {
+          mainContent.classList.add('qa-page-active');
+          startBouncer();
+        } else {
+          mainContent.classList.remove('qa-page-active');
+          stopBouncer();
+        }
+        // Travel page
+        if (sectionId === 'travel') {
+          mainContent.classList.add('travel-page-active');
+        } else {
+          mainContent.classList.remove('travel-page-active');
+        }
+      }
+      
+      // Update URL without page reload (preserve base path)
+      const basePath = getBasePath();
+      const path = sectionId === 'home' ? basePath + '/' : basePath + '/' + sectionId;
+      window.history.pushState({ section: sectionId }, '', path);
+      
+      // Close mobile menu if open
+      const menu = document.getElementById('mobileMenu');
+      const hamburger = document.querySelector('.hamburger');
+      if (menu) menu.classList.remove('active');
+      if (hamburger) hamburger.classList.remove('active');
+      
+      return false;
+    }
+    
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', function(e) {
+      if (e.state && e.state.section) {
+        showSectionFromUrl(e.state.section);
+      } else {
+        // Default to home if no state
+        showSectionFromUrl('home');
+      }
+    });
+    
+    // Helper function to show section without modifying history
+    function showSectionFromUrl(sectionId) {
+      const titles = {
+        'home': 'M & N',
+        'photos': 'Photos',
+        'qa': 'Q + A',
+        'travel': 'Hotels & Travel',
+        'things': 'Things to Do',
+        'rsvp': 'RSVP',
+        'registry': 'Our Registry'
+      };
+      
+      document.querySelectorAll('.page-section').forEach(section => {
+        section.classList.remove('active');
+      });
+      
+      document.querySelectorAll('#section-' + sectionId).forEach(section => {
+        section.classList.add('active');
+      });
+      
+      // Update nav active state (both desktop and mobile)
+      document.querySelectorAll('.site-nav a, .mobile-menu nav a').forEach(link => {
+        link.classList.remove('active');
+      });
+      
+      // Add active to links that match the current section
+      const sectionPath = sectionId === 'home' ? '/' : '/' + sectionId;
+      document.querySelectorAll('.site-nav a, .mobile-menu nav a').forEach(link => {
+        const href = link.getAttribute('href');
+        if ((href === '/' && sectionId === 'home') || href === sectionPath) {
+          link.classList.add('active');
+        }
+      });
+      
+      const mobileTitle = document.getElementById('mobilePageTitle');
+      if (mobileTitle && titles[sectionId]) {
+        mobileTitle.textContent = titles[sectionId];
+      }
+      
+      // Show/hide countdown and hero photo on mobile (only on home page)
+      const countdown = document.querySelector('.mobile-countdown');
+      const heroPhoto = document.querySelector('.mobile-hero-photo');
+      if (countdown) {
+        countdown.style.display = sectionId === 'home' ? 'flex' : 'none';
+      }
+      if (heroPhoto) {
+        heroPhoto.style.display = sectionId === 'home' ? 'block' : 'none';
+      }
+      
+      // Toggle page-specific classes for mobile header hiding
+      const mainContent = document.getElementById('mainContent');
+      if (mainContent) {
+        // Photos page
+        if (sectionId === 'photos') {
+          mainContent.classList.add('photos-page-active');
+        } else {
+          mainContent.classList.remove('photos-page-active');
+        }
+        // Registry page
+        if (sectionId === 'registry') {
+          mainContent.classList.add('registry-page-active');
+          // Force-restart animations to fix iOS sync issue
+          restartRegistryAnimations();
+        } else {
+          mainContent.classList.remove('registry-page-active');
+        }
+        // Q+A page
+        if (sectionId === 'qa') {
+          mainContent.classList.add('qa-page-active');
+          startBouncer();
+        } else {
+          mainContent.classList.remove('qa-page-active');
+          stopBouncer();
+        }
+        // Travel page
+        if (sectionId === 'travel') {
+          mainContent.classList.add('travel-page-active');
+        } else {
+          mainContent.classList.remove('travel-page-active');
+        }
+      }
+    }
+    
+  </script>
+</body>
+</html>
+
