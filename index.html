@@ -783,6 +783,12 @@
         display: none;
       }
     }
+
+    /* The registry page is full-bleed edge to edge, so the fixed side
+       scrollers would sit on top of the photo — hide them there. */
+    .registry-page-active .desktop-icon-scroller {
+      display: none;
+    }
     
     @keyframes scroll-icons-reverse {
       0% {
@@ -1414,161 +1420,92 @@
       .pg-lb-next { right: 10px; }
     }
     
-    /* Registry Coming Soon styles */
-    .registry-coming-soon {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 50vh;
-      padding: 40px 20px;
+    /* Registry — full-bleed two-column split (photo + copy + Zola CTA) */
+    /* Break the registry section out of the max-width/padding shared by the
+       other page-sections so the split runs edge to edge. */
+    #section-registry {
+      max-width: none;
+      margin: 0;
+      padding: 0;
     }
-    
-    .registry-circle {
-      position: relative;
-      width: 280px;
-      height: 280px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+
+    /* Selectors are #section-registry-scoped so they outrank the generic
+       `.page-section h2/p` rules (alignment, size, color, max-width, margins). */
+    #section-registry .reg-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 560px;
     }
-    
-    .registry-text {
-      text-align: center;
-      z-index: 1;
-    }
-    
-    .registry-text span {
-      font-family: 'Sacramento', cursive;
-      font-size: 3.5em;
-      color: #1a1a1a;
+
+    #section-registry .reg-photo { overflow: hidden; }
+    #section-registry .reg-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      /* Keep both faces framed in the crop (photo_13 focal ~48% 26%) */
+      object-position: 48% 26%;
       display: block;
-      line-height: 1.1;
     }
-    
-    .registry-text span:first-child {
-      padding-top: 10px;
+
+    #section-registry .reg-copy {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 70px 62px;
     }
-    
-    .registry-icons-ring {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      animation: registry-spin 20s linear infinite;
+    #section-registry .reg-script {
+      font-family: 'Sacramento', cursive;
+      font-size: 34px;
+      line-height: 1;
+      color: var(--accent);
+      text-align: left;
     }
-    
-    @keyframes registry-spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+    #section-registry .reg-title {
+      margin: 10px 0 0;
+      font-family: 'Bodoni Moda', serif;
+      font-weight: 500;
+      font-size: 52px;
+      line-height: 1.08;
+      color: var(--ink);
+      text-align: left;
     }
-    
-    @keyframes registry-counter-spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(-360deg); }
+    #section-registry .reg-body {
+      margin: 22px 0 0;
+      max-width: none;
+      font-family: 'Raleway', sans-serif;
+      font-size: 15px;
+      line-height: 1.85;
+      color: var(--muted);
+      text-align: left;
+      text-wrap: pretty;
     }
-    
-    .registry-icon-wrapper {
-      position: absolute;
-      width: 36px;
-      height: 36px;
-      top: 50%;
-      left: 50%;
-      margin-left: -18px;
-      margin-top: -18px;
+    #section-registry .reg-cta {
+      margin-top: 32px;
+      align-self: flex-start;
+      font-family: 'Raleway', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--bg);
+      background: var(--accent);
+      padding: 18px 40px;
+      text-decoration: none;
+      transition: background .2s;
     }
-    
-    .registry-icon-wrapper:nth-child(1) { transform: rotate(0deg) translateY(-120px); }
-    .registry-icon-wrapper:nth-child(2) { transform: rotate(45deg) translateY(-120px); }
-    .registry-icon-wrapper:nth-child(3) { transform: rotate(90deg) translateY(-120px); }
-    .registry-icon-wrapper:nth-child(4) { transform: rotate(135deg) translateY(-120px); }
-    .registry-icon-wrapper:nth-child(5) { transform: rotate(180deg) translateY(-120px); }
-    .registry-icon-wrapper:nth-child(6) { transform: rotate(225deg) translateY(-120px); }
-    .registry-icon-wrapper:nth-child(7) { transform: rotate(270deg) translateY(-120px); }
-    .registry-icon-wrapper:nth-child(8) { transform: rotate(315deg) translateY(-120px); }
-    
-    .registry-icon {
-      width: 100%;
-      height: 100%;
-      /* Use mask instead of filter for consistent color across iOS/Android */
-      background-color: var(--accent);
-      -webkit-mask-image: var(--icon-src);
-      mask-image: var(--icon-src);
-      -webkit-mask-size: contain;
-      mask-size: contain;
-      -webkit-mask-repeat: no-repeat;
-      mask-repeat: no-repeat;
-      -webkit-mask-position: center;
-      mask-position: center;
-      animation: registry-counter-spin 20s linear infinite;
-    }
-    
-    /* Hide the actual img, show the masked div */
-    .registry-icon-wrapper img.registry-icon {
-      opacity: 0;
-    }
-    
-    .registry-icon-wrapper::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: var(--accent);
-      -webkit-mask-size: contain;
-      mask-size: contain;
-      -webkit-mask-repeat: no-repeat;
-      mask-repeat: no-repeat;
-      -webkit-mask-position: center;
-      mask-position: center;
-      animation: registry-counter-spin 20s linear infinite;
-    }
-    
-    .registry-icon-wrapper:nth-child(1)::before { -webkit-mask-image: url('icons/registry/gift.svg'); mask-image: url('icons/registry/gift.svg'); animation-delay: 0s; }
-    .registry-icon-wrapper:nth-child(2)::before { -webkit-mask-image: url('icons/registry/home.svg'); mask-image: url('icons/registry/home.svg'); animation-delay: -2.5s; }
-    .registry-icon-wrapper:nth-child(3)::before { -webkit-mask-image: url('icons/registry/frying-pan.svg'); mask-image: url('icons/registry/frying-pan.svg'); animation-delay: -5s; }
-    .registry-icon-wrapper:nth-child(4)::before { -webkit-mask-image: url('icons/registry/plates.svg'); mask-image: url('icons/registry/plates.svg'); animation-delay: -7.5s; }
-    .registry-icon-wrapper:nth-child(5)::before { -webkit-mask-image: url('icons/registry/pot-and-lid.svg'); mask-image: url('icons/registry/pot-and-lid.svg'); animation-delay: -10s; }
-    .registry-icon-wrapper:nth-child(6)::before { -webkit-mask-image: url('icons/registry/knife.svg'); mask-image: url('icons/registry/knife.svg'); animation-delay: -12.5s; }
-    .registry-icon-wrapper:nth-child(7)::before { -webkit-mask-image: url('icons/registry/electric-mixer.svg'); mask-image: url('icons/registry/electric-mixer.svg'); animation-delay: -15s; }
-    .registry-icon-wrapper:nth-child(8)::before { -webkit-mask-image: url('icons/registry/sedan.svg'); mask-image: url('icons/registry/sedan.svg'); animation-delay: -17.5s; }
-    
-    /* Animation delays now set in ::before rules above */
-    
-    /* Mobile: Registry page fills available space */
+    #section-registry .reg-cta:hover { background: var(--ink); }
+
     @media (max-width: 768px) {
-      .registry-page-active .mobile-scroll-container .site-header {
-        display: none;
-      }
-      
-      .registry-page-active .mobile-scroll-container {
-        display: flex !important;
-        flex-direction: column;
-        height: 100%;
-      }
+      #section-registry .reg-split { grid-template-columns: 1fr; min-height: 0; }
+      #section-registry .reg-photo { height: 296px; }
+      /* bias the crop upward so faces are not cut off */
+      #section-registry .reg-photo img { object-position: 48% 18%; }
 
-      /* Take only the space above the footer so the footer stays visible */
-      .registry-page-active .mobile-sections {
-        flex: 1;
-        height: auto;
-        min-height: 0;
-      }
-
-      .registry-page-active #section-registry {
-        flex: 1;
-        display: flex !important;
-        min-height: 0;
-      }
-      
-      .registry-page-active .registry-coming-soon {
-        flex: 1;
-        width: 100%;
-        min-height: 0;
-        padding: 20px;
-        box-sizing: border-box;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
+      #section-registry .reg-copy   { padding: 28px 26px 44px; }
+      #section-registry .reg-script { font-size: 28px; }
+      #section-registry .reg-title  { font-size: 42px; }
+      #section-registry .reg-body   { margin-top: 14px; font-size: 14px; line-height: 1.8; }
+      #section-registry .reg-cta    { margin-top: 24px; align-self: stretch; text-align: center; padding: 18px 20px; letter-spacing: 0.18em; }
     }
     
     /* Q+A FAQ Accordion styles */
@@ -2216,7 +2153,7 @@
     // This properly handles iOS keyboard open/close without JavaScript manipulation
     
     // Encrypted wedding content (generated by build.js)
-    const ENCRYPTED_DATA = '{"salt":"7a502876e90f38e4ffa973c9450e6e5b","iv":"acad2bd956148b5883f0c64b06da435d","authTag":"1d9bec35234cc05d3d8de928dddd8994","content":"7aa096fd09d6782ec27be81dfb5b018eb98ea992bc1435d080062404b4d780a43b3d82e04d0ae61f0f92824a3d19dcdb563016d3045e4df5509f8ce39d703354d6a980b49d7b69501ff8d41d1a80d3ac571555f50660d8d2a797648968e462bf56b534e0f8fe33a827f735dbfc94279ae7bbed0b2ea4551f61f5eb6848f155d097a52048001a6ed84d72390b672cd957ab2a0b092c1a9ff9f1db408d6249ff1b84118e54a7380f6120b23c34591c572c51d3d739efd4527954ea1b2d6dd4728fb6ffeaf32660052dbe5ab232eed768aa09eeda8da2923d346c94cbb77c90f8eb100b7edb9d105ca441e4ecf52a1d56fe518b4999adaa19161e96474b21faa73165b6533d5d80f6914c5299bc4a56e02055051e67acfb805e6d27389da64cb38896e37290148cb8c9179fe808802b0405c7b4946b3d37206ad0c8ad5b1b8bb70bc2e0e1dc43b85047cc3e991907ca7c126258656f784d32f04651f591df9fc433dd65e60e3945ad8488742b060643336d571c636e8f44016c6037c49f448dbfd82a61d5f00ff81f9f4cd88295bb045270bdcc0578796cea7524da63de1200de997e230358b565e143d45fd5d4b5dbc3660c86bc33267d766e35243cc86b39256234ebba0fb69be16b47ad71c741580c1e2bebf5baf553e2946f1de8d5119263aaece2f9efa0a30cfa99e823b5632930a0ceb8cb365df2b6aee98800fdbfa92660d26db8737d192ffd961dffacd18b90da6e02a8794acb3a6386687f0ea317af71a113dd372b348020528d5d5325627b4a2dbde724d09fa7cdfdefcbb5537a22e29401c288be2d32bd730dc86cee52ce65d2f6bb1e718d9362c2e2da62800bb14fd6bd8c4e7de73e737e4748b7a184698aa61ff7db304526e84f215c6588482f03e908fc4b3364e26a5538b22a5d6894b79386731c42b5d8b5934c7da51df2acff3a9de7449c4b500faa5f7d01dddc2072c78cc129d344c58a2f8db3ac5d06f11d30d9d7b4b97f4658eed2f0e036d7e265d4f0c5630baac602d7431aece323e5e3d87bb7464e6849c334d15f3c4cf196996ac4957c25dee6e3045e742ce1fa4ba4da9c1a3e8f1acc32a9908911de6cf4e497c5c0e9d7da1cb99cfc8d628565e69e420532608996f9bb2c11d5bdfe732b80f6fc248c76ea9b18082608985bf58e0f2e9906290c41d8052412d26f655accf5323ccaeca47d0d3a43773b2adafbfcfe8e37d37bfee61441ea9c57f7823416626ee0d0d713a96bdaa418ba555342c1abf707e5ade3f65c9d5951db601f4d68cc0099395836f46ad94df348918e038f9acae47af1afd7c01e1bb831cc732aa2458df99aae35d1ce1d9183bb147663279b6151cfaf8906a1ba305b47ea849a05bc57ed7256de85907426b933bbfe0c9efdc5a004f6e634030164799162eefeb99ab443fbc8b3e8478606551bf9fe0cd42a2bf61acc9013f69282ca1b37ab3b9b"}';
+    const ENCRYPTED_DATA = '{"salt":"71ad5612282a483482d54d57ff29bd9c","iv":"082afcc446a41f3473b1b07cc84803b5","authTag":"942c55d8d88e02290aea584ded8aac62","content":"b0f549d897f37f8c86743aabf1d284e7836b731130f1620f35b1817c52bbbcb7570849442483f7934fae3d114cda68de1bc05f284b800fbc116e3446af8adf8fcb49892fc2b157c1558c14653777939a0587260cb7416acb4faa06c6ce64e02d5db5bb7bc3653931e9ebaaa206396852205c26bbeb28071eb70061e4f683a54e806e0511286a7993908874f920e5c75338a4d0437caa5b46831a3aefd21bc9430cf5effc27b0779aa1e70acee07341a0baa44cd107090fc4944c6a547a0e66ff9edd39458cbd81ad3fd16ede31b2e545f520e0cc69bcfafd485d7d809f0295e4f5e70f2870bc8afbafb34eacc5be6ae8c744fd297d5f7c7dd0b5f5be19942717419f578e854d97c7db52ea83a70101013bab4cfd65d24d95020357593104cb255a9d90e54615f29e810d292498f4aacbec703ceee6ad320bb5bc22d69f240ee27752d441c1a2d154bf871abfba0d6c72c5a8e9aa15412afe4dca5a3128142a647910ddbe42f21adb857b04ffe1710a1c3d0c0a32152a88e6ef8928ff6af2cff37a52531e2f9271444664582eedac20bdcb30882cb969143d2e551eca079afa928596c8c69a373df3819cb9d39bf4e127c31d6c2dff7164a6cf64d9b4bfd322e8d2c31e2cecc5514337664dbe6d1e9e2b33171ad80d64fb2be2ce75a1f87bc1322a39bfce0cc71b6fbc9df72c2a298503468eca044273334ab9cd3a1e239d0b9124344011634443505c5cf33fec8d9639658de85cfddbdaea8afd719e769a1527c7e72f5b1b1f9bd44d3d28f80094cb4ade6313b07570810fe784981e8e95d82f92527a41eb48d2d80b7972d4a964862805eb3f58e2abbdcaf06b76cdb7a23cb3c555e5b9d9a13713985e44f8bdbd90f77b8e49befcad68a21dd42796c5d75a0e4126a2625a641d48c87b4c4a87c52707ed5f491b200c4ef1697d50bd4c39c1abfa2f9841f9cac04904e2c60df7d9f0d4630d27fbcffa8627d3a004eebf073e94872153ca7dcf4d81b78cfd308c31805490a06f3929da59f576ae80b4a0838b6e25a02c52b312aff6374055e957aa4776aa4b536b3d80d67e3b7cc1ac7228267d6b211b4934d3799d776078d55eb0169078348ec54fa8265ae7ef8362a0314e27ff48b28dc3948aac33142224824153421af4230a4aad0ffd2527b3ae9aaed498c5499bbe20b49346af7c74faf65a70d97690337c4efb51b07231802772289db9a00d0255b646ff03d6afe85c1159570185f9e4180527955bea0922acc3fbcdb9009e316247ce8487a65f5e70a5034bf9bd8b26d60e47728e6b06690080c4ed573096cf84bee291a2173a0662ecea89d041c37f891d7827118391b8199b3c8335ded5c9b3d81e5b3d63077b9d24f42f3d15e41b2723c6482cba427e0a6cb3542c8bb1d009354133e16af88d224b14172c6f1dfa7b163d2eb9821f020e748777525f792e32217dfd072291489669bcbf"}';
 
     // Hold the password box behind a "Loading…" state until the background
     // video has painted its first frame (or we time out / it errors), so the
@@ -2505,7 +2442,7 @@
       }
 
       // Photo gallery: thumbnail cells (click/tap opens the full-image lightbox)
-      const PHOTO_COUNT = 75;
+      const PHOTO_COUNT = 74;
       let photoCells = '';
       for (let i = 1; i <= PHOTO_COUNT; i++) {
         photoCells += `<button type="button" class="pg-cell" data-idx="${i}"><img src="gallery/thumbs/photo_${i}.jpg" alt="Meghan &amp; Nolan photo ${i}"></button>`;
@@ -2746,22 +2683,13 @@
         
         <!-- Registry Section -->
         <section class="page-section" id="section-registry">
-          <div class="registry-coming-soon">
-            <div class="registry-circle">
-              <div class="registry-text">
-                <span>Coming</span>
-                <span>Soon!</span>
-              </div>
-              <div class="registry-icons-ring">
-                <div class="registry-icon-wrapper"><img src="icons/registry/gift.svg" alt="" class="registry-icon"></div>
-                <div class="registry-icon-wrapper"><img src="icons/registry/home.svg" alt="" class="registry-icon"></div>
-                <div class="registry-icon-wrapper"><img src="icons/registry/frying-pan.svg" alt="" class="registry-icon"></div>
-                <div class="registry-icon-wrapper"><img src="icons/registry/plates.svg" alt="" class="registry-icon"></div>
-                <div class="registry-icon-wrapper"><img src="icons/registry/pot-and-lid.svg" alt="" class="registry-icon"></div>
-                <div class="registry-icon-wrapper"><img src="icons/registry/knife.svg" alt="" class="registry-icon"></div>
-                <div class="registry-icon-wrapper"><img src="icons/registry/electric-mixer.svg" alt="" class="registry-icon"></div>
-                <div class="registry-icon-wrapper"><img src="icons/registry/sedan.svg" alt="" class="registry-icon"></div>
-              </div>
+          <div class="reg-split">
+            <div class="reg-photo"><img src="registry-photo.jpg" alt="Meghan and Nolan"></div>
+            <div class="reg-copy">
+              <div class="reg-script">your presence is plenty</div>
+              <h2 class="reg-title">Registry</h2>
+              <p class="reg-body">We&rsquo;re asking you to give up your New Year&rsquo;s Eve for us, so honestly, you&rsquo;ve done plenty! But if you want to send us something extra, we have a list on Zola, including a fund for our honeymoon to somewhere warm in January &#127796;</p>
+              <a class="reg-cta" href="https://www.zola.com/registry/meghanandnolandecember31" target="_blank" rel="noopener">Visit Zola Registry</a>
             </div>
           </div>
         </section>
@@ -2973,7 +2901,7 @@
     // cropped out of the "cover"-fit swipe cards. Generated from Apple Vision
     // face detection via scripts/focal_points.py. Photos not listed here have
     // no confidently detected faces and fall back to default centering.
-    var PG_FOCAL = {"1":"68% 73%","2":"34% 58%","3":"53% 64%","4":"49% 63%","5":"71% 64%","6":"49% 66%","7":"55% 75%","8":"51% 48%","9":"57% 39%","10":"49% 33%","11":"60% 54%","12":"51% 20%","13":"48% 26%","14":"49% 35%","15":"52% 46%","16":"31% 46%","17":"40% 66%","18":"53% 62%","19":"52% 58%","20":"54% 18%","21":"48% 41%","22":"47% 52%","23":"39% 34%","24":"57% 33%","25":"34% 53%","26":"53% 26%","27":"43% 64%","28":"48% 47%","29":"57% 81%","30":"50% 35%","31":"33% 61%","32":"15% 50%","33":"58% 42%","34":"47% 49%","35":"43% 43%","36":"44% 41%","37":"51% 41%","38":"55% 29%","39":"54% 39%","40":"22% 39%","41":"38% 62%","42":"63% 53%","43":"47% 44%","44":"50% 54%","45":"53% 35%","46":"48% 31%","47":"30% 61%","48":"56% 43%","49":"53% 47%","50":"50% 42%","51":"42% 58%","52":"49% 35%","53":"52% 41%","54":"20% 64%","55":"46% 28%","56":"31% 47%","57":"29% 46%","58":"41% 38%","59":"46% 31%","60":"44% 48%","61":"49% 26%","62":"52% 45%","63":"51% 51%","64":"38% 46%","65":"52% 36%","66":"52% 52%","67":"48% 61%","68":"46% 50%","69":"59% 43%","70":"46% 45%","71":"55% 42%","72":"48% 52%","73":"53% 60%","74":"68% 48%","75":"45% 47%"};
+    var PG_FOCAL = {"1":"68% 73%","2":"34% 58%","3":"53% 64%","4":"49% 63%","5":"71% 64%","6":"49% 66%","7":"55% 75%","8":"51% 48%","9":"57% 39%","10":"49% 33%","11":"60% 54%","12":"51% 20%","13":"49% 35%","14":"52% 46%","15":"31% 46%","16":"40% 66%","17":"53% 62%","18":"52% 58%","19":"54% 18%","20":"48% 41%","21":"47% 52%","22":"39% 34%","23":"57% 33%","24":"34% 53%","25":"53% 26%","26":"43% 64%","27":"48% 47%","28":"57% 81%","29":"50% 35%","30":"33% 61%","31":"15% 50%","32":"58% 42%","33":"47% 49%","34":"43% 43%","35":"44% 41%","36":"51% 41%","37":"55% 29%","38":"54% 39%","39":"22% 39%","40":"38% 62%","41":"63% 53%","42":"47% 44%","43":"50% 54%","44":"53% 35%","45":"48% 31%","46":"30% 61%","47":"56% 43%","48":"53% 47%","49":"50% 42%","50":"42% 58%","51":"49% 35%","52":"52% 41%","53":"20% 64%","54":"46% 28%","55":"31% 47%","56":"29% 46%","57":"41% 38%","58":"46% 31%","59":"44% 48%","60":"49% 26%","61":"52% 45%","62":"51% 51%","63":"38% 46%","64":"52% 36%","65":"52% 52%","66":"48% 61%","67":"46% 50%","68":"59% 43%","69":"46% 45%","70":"55% 42%","71":"48% 52%","72":"53% 60%","73":"68% 48%","74":"45% 47%"};
 
     function ensureLightbox() {
       if (galleryLb) return galleryLb;
@@ -3378,20 +3306,6 @@
       hamburger.classList.toggle('active');
     }
     
-    // Force-restart registry animations to fix iOS sync issue
-    function restartRegistryAnimations() {
-      const ring = document.querySelector('.registry-icons-ring');
-      const wrappers = document.querySelectorAll('.registry-icon-wrapper');
-      if (ring) {
-        // Briefly remove animation, force reflow, then restore
-        ring.style.animation = 'none';
-        wrappers.forEach(w => w.style.animation = 'none');
-        void ring.offsetWidth; // Force reflow
-        ring.style.animation = '';
-        wrappers.forEach(w => w.style.animation = '');
-      }
-    }
-    
     function toggleQA(element) {
       const qaItem = element.parentElement;
       qaItem.classList.toggle('active');
@@ -3516,8 +3430,6 @@
         // Registry page
         if (sectionId === 'registry') {
           mainContent.classList.add('registry-page-active');
-          // Force-restart animations to fix iOS sync issue
-          restartRegistryAnimations();
         } else {
           mainContent.classList.remove('registry-page-active');
         }
@@ -3622,8 +3534,6 @@
         // Registry page
         if (sectionId === 'registry') {
           mainContent.classList.add('registry-page-active');
-          // Force-restart animations to fix iOS sync issue
-          restartRegistryAnimations();
         } else {
           mainContent.classList.remove('registry-page-active');
         }
