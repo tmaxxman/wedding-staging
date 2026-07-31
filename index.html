@@ -2119,6 +2119,79 @@
     .hidden {
       display: none;
     }
+
+    /* ===================== Rowing game ===================== */
+    .game-root { max-width: 940px; margin: 0 auto; }
+    .game-intro { text-align: center; margin: 0 auto 20px; }
+    .game-intro h2 { margin: 6px 0 8px; }
+    .game-sub { max-width: 560px; margin: 0 auto; color: #4a4a4a; font-size: 15px; line-height: 1.55; }
+    .game-stage {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      aspect-ratio: 900 / 600;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #cfe7ef;
+      box-shadow: 0 12px 34px rgba(0,0,0,.14);
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      cursor: pointer;
+    }
+    .game-canvas { display: block; width: 100%; height: 100%; }
+    .game-hud {
+      position: absolute; top: 10px; left: 15px;
+      font-weight: 800; color: #0d2b33;
+      font-size: clamp(18px, 3.4vw, 26px);
+      letter-spacing: .5px; pointer-events: none;
+      text-shadow: 0 1px 3px rgba(255,255,255,.55);
+      font-variant-numeric: tabular-nums;
+    }
+    .game-hud .unit { font-size: .6em; opacity: .8; margin-left: 3px; }
+    .game-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 13px;
+      text-align: center; padding: 22px;
+      background: rgba(12,32,40,.46); color: #fff;
+      -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+    }
+    .game-overlay.hidden { display: none; }
+    .game-overlay h3 { margin: 0; font-size: clamp(22px, 4vw, 30px); color: #fff; }
+    .game-overlay p { margin: 0; max-width: 430px; font-size: 15px; line-height: 1.5; opacity: .95; }
+    .game-dist { font-size: clamp(32px, 7vw, 54px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+    .game-dist .unit { font-size: .38em; opacity: .85; font-weight: 700; }
+    .game-btn {
+      appearance: none; -webkit-appearance: none; border: none; cursor: pointer;
+      background: var(--accent); color: #fff; font-weight: 700; font-family: inherit;
+      padding: 11px 26px; border-radius: 999px; font-size: 15px; letter-spacing: .4px;
+      transition: background .15s ease, transform .05s ease;
+    }
+    .game-btn:hover { background: var(--accent-dark); }
+    .game-btn:active { transform: translateY(1px); }
+    .game-btn.game-ghost { background: transparent; border: 1px solid rgba(255,255,255,.6); }
+    .game-btn.game-ghost:hover { background: rgba(255,255,255,.12); }
+    .game-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center; }
+    .game-name {
+      border: none; border-radius: 999px; padding: 10px 16px; font-size: 15px; font-family: inherit;
+      text-align: center; width: min(240px, 66vw); outline: none; background: #fff; color: var(--ink);
+    }
+    .game-msg { min-height: 17px; font-size: 13px; opacity: .95; }
+    .game-best { font-size: 14px; opacity: .92; min-height: 17px; }
+
+    .game-board { max-width: 520px; margin: 28px auto 0; }
+    .game-board h3 { text-align: center; margin: 0 0 12px; }
+    .lb-list { list-style: none; margin: 0; padding: 0; }
+    .lb-row { display: flex; align-items: baseline; justify-content: space-between; padding: 9px 14px; border-radius: 10px; }
+    .lb-row:nth-child(odd) { background: var(--bg-alt); }
+    .lb-rank { width: 28px; color: var(--accent); font-weight: 800; font-variant-numeric: tabular-nums; }
+    .lb-name { flex: 1; padding: 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-name.me { color: var(--accent-dark); font-weight: 800; }
+    .lb-meters { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .lb-meters .unit { font-size: .8em; opacity: .6; margin-left: 2px; font-weight: 600; }
+    .lb-empty { text-align: center; opacity: .55; padding: 16px; }
   </style>
 </head>
 <body>
@@ -2164,12 +2237,238 @@
     </div>
   </div>
 
+  <!-- Shared, deterministic rowing-game physics. Injected by build.js from
+       backend/src/game-sim.js so the browser runs the EXACT code the Lambda uses
+       to verify runs. Defines window.GameSim. Do not edit here. -->
+  <script>
+    /*
+ * SHARED, DETERMINISTIC rowing-game simulation.
+ *
+ * This exact file runs in TWO places:
+ *   1. The browser (build.js injects it into template.html at __GAME_SIM__), for
+ *      live play + rendering.
+ *   2. The Lambda (backend/src/game.js requires it), to REPLAY a submitted run
+ *      and compute the authoritative distance.
+ *
+ * Because the server trusts only its own replay, the two must produce identical
+ * results for the same (seed, inputTicks). To keep it engine-independent
+ * (V8 in Node vs whatever the guest's browser uses), the physics uses ONLY
+ * IEEE-754-deterministic operations: + - * /, comparisons, Math.floor,
+ * Math.imul, and a seeded integer PRNG. NO Math.random, Math.sin, Math.pow, etc.
+ *
+ * Rendering (oars, wake, boat tilt, colors) lives in the browser engine ONLY and
+ * must never feed back into physics/collision here. Collision uses the boat hull
+ * position/hitbox exclusively, so replay stays exact.
+ *
+ * If you change any physics/course constant below, bump COURSE_VERSION so old
+ * (incompatible) submissions are rejected by the server.
+ *
+ * Exposed as `GameSim` on the browser global and as module.exports in Node.
+ * The whole module is wrapped so nothing but `GameSim` leaks into the page.
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.GameSim = api;
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  var COURSE_VERSION = 1;
+
+  // ---- Logical world / render size (world units == canvas logical px) ----
+  var W = 900;            // logical canvas width
+  var H = 600;            // logical canvas height
+  var BOAT_X_FRAC = 0.30; // boat's fixed horizontal screen position (fraction of W)
+  var BOAT_HW = 30;       // boat hull half-width  (collision)
+  var BOAT_HH = 9;        // boat hull half-height (collision)
+
+  // ---- Physics (per fixed tick; DT is informational, constants fold it in) ----
+  var DT = 1 / 60;
+  var GRAV = 0.16;          // downward accel when NOT pressed
+  var LIFT = 0.34;          // upward accel when pressed (net -0.18 while held)
+  var VY_MAX = 5.0;         // terminal vertical speed
+  var SPEED0 = 2.7;         // starting forward speed (units/tick)
+  var SPEED_RAMP = 0.00005; // forward speed gained per world unit travelled
+  var SPEED_MAX = 6.2;
+
+  // ---- Course geometry ----
+  var SEG_W = 70;         // world units per block segment
+  var ANCHOR_SEG = 6;     // cave-center anchors spaced every ANCHOR_SEG segments
+  // (wide spacing keeps the cave's vertical slope followable by the boat)
+  var CENTER_MIN = 170;   // min cave-center Y
+  var CENTER_SPAN = 230;  // cave center ranges CENTER_MIN .. CENTER_MIN+CENTER_SPAN
+  var START_GAP = 360;    // vertical gap between ceiling & floor at the start
+  var MIN_GAP = 205;      // gap floor once fully narrowed
+  var NARROW = 0.9;       // gap lost per segment travelled
+  var SAFE_SEG = 14;      // no blocks before this segment (orientation grace)
+  var BLOCK_EVERY = 3;    // only every Nth segment may hold a block (guarantees
+  // >= (BLOCK_EVERY-1)*SEG_W spacing, so no impossible opposite-side pinches)
+  var BLOCK_PROB = 0.55;  // chance an eligible segment spawns a jutting block
+  var BLOCK_W = 26;       // block width (world units)
+
+  // Cap replay/record length (~8 min at 60fps) to bound Lambda compute.
+  var MAX_TICKS = 60 * 60 * 8;
+
+  var UNITS_PER_METER = 6; // distance scaling -> "meters" (rowing feel)
+
+  // -------------------------------------------------------------------------
+  // Deterministic hashing: map (seed, k, salt) -> float in [0,1). Integer ops
+  // only (xmur3-style mix) plus one final division. Allows O(1) random access to
+  // any segment, so client and server agree without sequential PRNG state.
+  // -------------------------------------------------------------------------
+  function hash01(seed, k, salt) {
+    var h = (seed ^ Math.imul(k + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca77)) >>> 0;
+    h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
+    h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
+    h = (h ^ (h >>> 16)) >>> 0;
+    return h / 4294967296;
+  }
+
+  function smooth(t) { return t * t * (3 - 2 * t); } // smoothstep, multiply-only
+
+  function makeCourse(seed) {
+    seed = seed >>> 0;
+
+    function anchor(i) { return hash01(seed, i, 0); }
+
+    // Ceiling / floor / center at an arbitrary world-x. The center is smoothly
+    // interpolated between anchors spaced ANCHOR_SEG*SEG_W apart (gentle slope),
+    // while the gap narrows per block-segment as distance grows.
+    function boundsAt(x) {
+      var span = SEG_W * ANCHOR_SEG;
+      var t = x / span;
+      var i = Math.floor(t);
+      var frac = t - i;
+      var a = anchor(i);
+      var b = anchor(i + 1);
+      var v = a + (b - a) * smooth(frac);
+      var center = CENTER_MIN + v * CENTER_SPAN;
+      var gap = START_GAP - (x / SEG_W) * NARROW;
+      if (gap < MIN_GAP) gap = MIN_GAP;
+      var half = gap * 0.5;
+      return { ceil: center - half, floor: center + half, center: center, gap: gap };
+    }
+
+    // A jutting block for segment k, or null. Deterministic from (seed, k).
+    function blockAt(k) {
+      if (k < SAFE_SEG) return null;
+      if (k % BLOCK_EVERY !== 0) return null; // enforce spacing between blocks
+      if (hash01(seed, k, 1) >= BLOCK_PROB) return null;
+      var midx = k * SEG_W + SEG_W * 0.5;
+      var bnd = boundsAt(midx);
+      var top = hash01(seed, k, 2) < 0.5;
+      var pen = bnd.gap * (0.26 + hash01(seed, k, 4) * 0.26); // reach into the gap (<= ~half)
+      var bx = k * SEG_W + hash01(seed, k, 3) * (SEG_W - BLOCK_W);
+      var y0, y1;
+      if (top) { y0 = bnd.ceil; y1 = bnd.ceil + pen; }
+      else { y1 = bnd.floor; y0 = bnd.floor - pen; }
+      return { x: bx, w: BLOCK_W, y0: y0, y1: y1, top: top };
+    }
+
+    // Blocks whose x-span could touch a boat hull centered near world-x.
+    function blocksNear(x) {
+      var out = [];
+      var k0 = Math.floor((x - BOAT_HW - SEG_W) / SEG_W);
+      var k1 = Math.floor((x + BOAT_HW) / SEG_W);
+      for (var k = k0; k <= k1; k++) {
+        if (k < 0) continue;
+        var b = blockAt(k);
+        if (b) out.push(b);
+      }
+      return out;
+    }
+
+    // All blocks with any part in [x0, x1] (for rendering).
+    function blocksInRange(x0, x1) {
+      var out = [];
+      var k0 = Math.floor(x0 / SEG_W) - 1;
+      var k1 = Math.floor(x1 / SEG_W) + 1;
+      for (var k = k0; k <= k1; k++) {
+        if (k < 0) continue;
+        var b = blockAt(k);
+        if (b && b.x + b.w >= x0 && b.x <= x1) out.push(b);
+      }
+      return out;
+    }
+
+    return { boundsAt: boundsAt, blocksNear: blocksNear, blocksInRange: blocksInRange };
+  }
+
+  function makeState(seed) {
+    var course = makeCourse(seed >>> 0);
+    var start = course.boundsAt(0);
+    return { tick: 0, x: 0, y: start.center, vy: 0, crashed: false, course: course };
+  }
+
+  // Advance exactly one fixed tick. `pressed` = oar held this tick.
+  function step(state, pressed) {
+    if (state.crashed) return state;
+
+    var speed = SPEED0 + state.x * SPEED_RAMP;
+    if (speed > SPEED_MAX) speed = SPEED_MAX;
+
+    state.vy += pressed ? -LIFT : GRAV;
+    if (state.vy > VY_MAX) state.vy = VY_MAX;
+    else if (state.vy < -VY_MAX) state.vy = -VY_MAX;
+
+    state.y += state.vy;
+    state.x += speed;
+    state.tick += 1;
+
+    var b = state.course.boundsAt(state.x);
+    if (state.y - BOAT_HH < b.ceil || state.y + BOAT_HH > b.floor) {
+      state.crashed = true;
+      return state;
+    }
+    var blocks = state.course.blocksNear(state.x);
+    for (var i = 0; i < blocks.length; i++) {
+      var bl = blocks[i];
+      if (state.x + BOAT_HW > bl.x && state.x - BOAT_HW < bl.x + bl.w &&
+          state.y + BOAT_HH > bl.y0 && state.y - BOAT_HH < bl.y1) {
+        state.crashed = true;
+        return state;
+      }
+    }
+    return state;
+  }
+
+  // Replay a run. `toggles` = ascending tick indices where the hold state flips
+  // (starting from not-pressed). Returns authoritative { meters, ticks }.
+  function simulate(seed, toggles, maxTicks) {
+    var state = makeState(seed);
+    toggles = toggles || [];
+    var cap = maxTicks || MAX_TICKS;
+    if (cap > MAX_TICKS) cap = MAX_TICKS;
+    var pressed = false;
+    var ti = 0;
+    while (!state.crashed && state.tick < cap) {
+      while (ti < toggles.length && toggles[ti] === state.tick) { pressed = !pressed; ti++; }
+      step(state, pressed);
+    }
+    return { meters: Math.floor(state.x / UNITS_PER_METER), ticks: state.tick };
+  }
+
+  return {
+    COURSE_VERSION: COURSE_VERSION,
+    W: W, H: H, BOAT_X_FRAC: BOAT_X_FRAC, BOAT_HW: BOAT_HW, BOAT_HH: BOAT_HH,
+    DT: DT, VY_MAX: VY_MAX, UNITS_PER_METER: UNITS_PER_METER, MAX_TICKS: MAX_TICKS,
+    SEG_W: SEG_W,
+    hash01: hash01,
+    makeCourse: makeCourse,
+    makeState: makeState,
+    step: step,
+    simulate: simulate
+  };
+});
+
+  </script>
+
   <script>
     // Mobile video height is now handled by CSS using 100dvh (dynamic viewport height)
     // This properly handles iOS keyboard open/close without JavaScript manipulation
     
     // Encrypted wedding content (generated by build.js)
-    const ENCRYPTED_DATA = '{"salt":"1bcbbbdc45aeceb3e7b0dc702356efbf","iv":"fa78fadd1371bf5b4aab0148e1d25841","authTag":"60deb56ed03ce4ae8612864a089dbad2","content":"2b07bdefcf7c4a14a0411f1a490378d7048d1c6cf06d315092cdcbe18d07e69e7c737c0bf12a60328f1c28144d284e666d9db0f86fc018c1d699234851c86dd0ed45c80e50934fafb3874f4784c6cf2bceb4e4cd84f390bf9396974c774395eff4f24d9c91f3529a3097cf1f3b5d32e470277100087687bd673227dd12387e184430425cfcd1fed99e265688edb2a2fbdb1092c2727f4ee83dade08e5e96038c9f4c5d8386e88e2c2bbb6d6d3fd033a7cc91cf2ac4469689e65adb961fdc70f39ce7750fff849bc7064433bc1c429b13e1e838cd95db348d79ce65c54671de7fb2681b01bf89f1c3aa674223618086a855c7857ea4d6d28700137997d6bf74bcb0d7e987a4ea3bc7fd1b22e6b1b87a154c350dfe444e65f7ff37abaa301d225e87520d891915617198b41505e31fd228a9f91584a56e6f4385dc3ae0280ec7e691d5a4f3f2d5d06b49b0744847ed3bcfded3cc2111e8f2c2357aff1d9bf9caa1a286536a0f8e30c10bef448c7686cebfa9f26d30c575df938468622a7ff4bd46a6a171e60f95f0d9efc91dce7a65e6a41f240ff58f8c5072e8445601f1cc8c329cc42cd86c7b16bc4ad615025cabb58fcc21f8971fde5d6fa0f28a98ff0771cd578129be2b1295fc9c8fe918e0619d630c2c4ead248b2737f69fe201a3b50cda1f8f3180ad51e4b97c4eddf79b60a167d9f4e3ff41e1fbeaa30e05da8700d695a184af2bb8ab5382fbc5c0e971f74db8f7909701b39daa1c9b661f638d40a17739bdc7041c022bd605b6b5d5382afd6257e5160ebca79382ed8cb4709ea03115540af28ef5d96f631f4131564ee6ea84598d2d81aec1c609ef19cb5d85c74794ba479dd366e4de9b517fbce7bc51acb3a99ce56ae84b18d584cbe06d1d4e03c3f2eced3ed018341295bc20dfe2036ce5eb106d6e43259ff74eff849043bc9559e76b96bf21dc60b54cc2a5ae9cf8600e9d556d2f501b2ac1090cb0b76cd00c9627ef1cc9f7d837ed7a4484c6a51f39e4820e8f1a8bfefbee9ee5bb0a9ff125f5a10bcf60261342cd3667ea416db8166d2f9ea9317ca6be95ba01a2bf8cfa9ea54898bfeef347cbb2da526e533bc9b3daa2b52db62337b2cd8c271ecf5a75526578f50dc4dd06aca8751c9f78e2bbc9fee86839277c44609d4c1134ad44a67a0554ef69c997122e2d42552efc48b08548dfd6a748cc71a732e8ce2b030437ee27ad751c8a07e6935fcd6fc12463ca234af0ceed9b753dcf52c9f278832a9c24da90b433d0b3165e791612701b4594cf1cef869ae3c891a71bbb524d0e8c5e46f1f5f3fcf8ea5c988725aa73f855310aa8e160d6344889b6da24ee8cbc6bd5ac773701cbe3a3f9ad34902cd5a65ec914af10c1159105e445b12e0b15fc1be20ead83361eeeb6cde12b1149d4900a6fe0dbd4f0851b486b731554f4ce36a30fb879cd14e063fdd6f8f4c157b21167ea11"}';
+    const ENCRYPTED_DATA = '{"salt":"c42e68554c8b1fe32b5c9b87d93bc7d7","iv":"6ccff603b98d0468854080b6f5c75de4","authTag":"6e28804fe991ffcb5d31d4a5d19a3ac4","content":"c4c42b02c7654646f781c25042f89a93a706c28c1902e21d16af35d6c65ef6dadb5f1a902e254f0f617ea30a217d5025fdba3ec044b4909e75030535b03f7f21e5aa1a5a1e8198c5bc2952808f789f6b57699bc22c516930496cf47927932451ac85a912d0cb64244f198bc856d1b624b9dbfa0540c356ca5688c324813b6442209ea7551b227634faab64416851792b2b1a506f7796a7d70dd20af4269c1129820ae300fd8726beafe2b6da2f6967ec7b3c3eab44268fd22ffd07c1611a164e6b9e85182ac9f5d1f8527ecb7aff5302d3db50d103fe236159eb229ccfb6d84042a7cf1664a47042e2cde57bfb60001027dc8f4bd16dc7b350a019969557be35a93f12bc14ac14b32edf3803f9cf6a6c81bf85c39ff657d65c6ea5316b4735416f7e03275c315616e36f858d8cdc2b2384d2aef4315bff09bfa5808ab2073610e39e0d12b1e07ce5992aa9fed9a07c6a4b8548f9b1ec7bb4df26d55ecfc4d13db44d64690f130aca6558b8f3a4cc6b50b79fd9fb127a1097e0140fd59104f23176abdcb70f3f0372c8387eee7644cd8ebc21560dea67533b1a7d5753d01797ec107c933f6ffe01ce772d577b0e0a1124b8a4c7d2335fb89c51237734f8b99c889ac3e59a9f8c14413965751e1dbf9bbfcb51ec38a88ccf54e554922ecd9e1fc749a6f2fff4c748ebeb221b20030dc2e729df011829c170e3cff2dc365e4e75e1c2e252a365ad22980db8e13828fa3cd7316a81f44b9519313659cf2186afb75b75fa14026f99c3d71eb1611900150944edea1ccd522b74cdcff3a5a8d6639df20fad688ecd5e530cc4f53b6b04dec694eb3662de927e30fe2d27771200a8060ad80b2574a5e44dc04298611c1a3ac1e61d025f467027eb38749f50a5d9773e16be7b204eccd12abb0aa8ec4cfeb88d564f9e9f9cfaff00e667869d57ab4188780493af937766829d339a1d7e6a682907fbb572b64ade8ab3fb18584297e611116323722b04138fba1d019dfea4f967debc88cdc03413cf563adfe8cf1887603b51119052f23492c5ec4ffbc5aa2dd94157420880c13c38e7f6b7978b96ac6fac9bf55b7cd732cdd87a0932acefb4dc669ce718702717b90a65aa92da83d9a618fb9fe193095e0615faaaf8912353f48ff8f5a563ff5a02906998baa12d08bb412cfaf6d882030fdf024e9e31590e1f545b2ceb853ad1e78da67d9e36a7e7a7539b58d859b94a8adefeb30304bcd502df8b77753e5467d011b1adb316d9dec5d2f669b27efac63e8b9658a84972a0abc480cd8168af8236c4178c2f7fc5a0d616b668d0a757505f73b7d91c85cba30dac0ae1fc816332ec18ee8680e15979b29cdd555ec9c7fdeab5c74fdf500915a110939b348747cc918126553d2ba4e2546b8fc3e68a6af16c3c499cc6033f98fcc6efca4eb0a64893ecd962895f3f59a563422272279b67e371e5dd1ceed90874"}';
 
     // Hold the password box behind a "Loading…" state until the background
     // video has painted its first frame (or we time out / it errors), so the
@@ -2709,6 +3008,41 @@
             </div>
           </div>
         </section>
+
+        <!-- Rowing Game Section -->
+        <section class="page-section" id="section-game">
+          <div class="game-root">
+            <div class="game-intro">
+              <div class="kicker">just for fun</div>
+              <h2>Row the Charles</h2>
+              <p class="game-sub">Click &amp; hold to row up, release to drift down. Dodge the banks and buoys and see how far you can row.</p>
+            </div>
+            <div class="game-stage">
+              <canvas class="game-canvas" width="900" height="600"></canvas>
+              <div class="game-hud"><span class="game-hud-m">0</span><span class="unit">m</span></div>
+              <div class="game-overlay game-start">
+                <h3>Row the Charles</h3>
+                <p>Click &amp; hold (or press Space) to row up. Release to drift down. Avoid the banks and the buoys.</p>
+                <button type="button" class="game-btn game-start-btn">Start rowing</button>
+                <div class="game-best"></div>
+              </div>
+              <div class="game-overlay game-over hidden">
+                <h3 class="game-over-title">Caught a crab!</h3>
+                <div class="game-dist"><span class="game-over-m">0</span><span class="unit"> m</span></div>
+                <div class="game-row">
+                  <input type="text" class="game-name" maxlength="12" placeholder="Your name" aria-label="Your name" autocomplete="off">
+                  <button type="button" class="game-btn game-save-btn">Save score</button>
+                </div>
+                <div class="game-msg"></div>
+                <button type="button" class="game-btn game-ghost game-again-btn">Play again</button>
+              </div>
+            </div>
+            <div class="game-board">
+              <h3>Leaderboard</h3>
+              <ol class="lb-list"><li class="lb-empty">Loading&hellip;</li></ol>
+            </div>
+          </div>
+        </section>
       `;
       
       content.innerHTML = `
@@ -2804,6 +3138,7 @@
             <a href="/photos" onclick="showSection('photos'); return false;">Photos</a>
             <a href="/registry" onclick="showSection('registry'); return false;">Registry</a>
             <a href="/qa" onclick="showSection('qa'); return false;">Q + A</a>
+            <a href="/game" onclick="showSection('game'); return false;">Game</a>
             <!-- <a href="/things" onclick="showSection('things'); return false;">Things to Do</a> -->
             <!-- <a href="/rsvp" onclick="showSection('rsvp'); return false;">RSVP</a> -->
           </nav>
@@ -2835,6 +3170,7 @@
             <a href="/photos" onclick="showSection('photos'); return false;">Photos</a>
             <a href="/registry" onclick="showSection('registry'); return false;">Registry</a>
             <a href="/qa" onclick="showSection('qa'); return false;">Q + A</a>
+            <a href="/game" onclick="showSection('game'); return false;">Game</a>
           </nav>
           <div class="menu-icon-scroller-top">
             <div class="icon-track-reverse">
@@ -2903,6 +3239,9 @@
 
       // Wire up the photo gallery (both shells share one lightbox)
       initPhotoGallery();
+
+      // Wire up the rowing game (both shells have their own canvas)
+      initGame();
     }
 
     // ===================== Photo gallery =====================
@@ -2961,6 +3300,429 @@
     // Kick off the background fetch immediately (independent of the password
     // gate) so totals are ready well before the user reaches the Photos page.
     pgFetchCounts();
+
+    // ===================== Rowing game =====================
+    // Canvas engine for the "Row the Charles" game. Physics/collision come from
+    // the shared window.GameSim (also run server-side to verify runs); everything
+    // below is presentation + input recording + leaderboard I/O. All the boat
+    // animation (oars, wake, tilt) is cosmetic and never feeds back into GameSim.
+    var GAME_LB_KEY = 'mn-leaderboard';
+    var GAME_NAME_KEY = 'mn-game-name';
+    var GAME_BEST_KEY = 'mn-game-best';
+    var gameCtls = [];
+    var gameLB = [];
+    try { gameLB = JSON.parse(localStorage.getItem(GAME_LB_KEY) || '[]') || []; } catch (e) { gameLB = []; }
+
+    function initGame() {
+      if (!window.GameSim) return;
+      document.querySelectorAll('.game-root').forEach(function (root) {
+        if (root._gameCtl) return;
+        var ctl = setupGame(root);
+        root._gameCtl = ctl;
+        gameCtls.push(ctl);
+      });
+      renderAllBoards();
+      gameFetchLeaderboard();
+    }
+
+    // Called on navigation into / out of the game page (see showSection hooks).
+    function gameEnter() {
+      gameFetchLeaderboard();
+      gameCtls.forEach(function (c) { if (c.visible()) c.enter(); else c.leave(); });
+    }
+    function gameLeave() { gameCtls.forEach(function (c) { c.leave(); }); }
+
+    function gameFetchLeaderboard() {
+      fetch(PG_API + '/leaderboard', { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (list) {
+          if (!Array.isArray(list)) return;
+          gameLB = list;
+          try { localStorage.setItem(GAME_LB_KEY, JSON.stringify(list)); } catch (e) {}
+          renderAllBoards();
+        })
+        .catch(function () {});
+    }
+
+    function renderAllBoards() {
+      document.querySelectorAll('.game-root .lb-list').forEach(renderBoard);
+    }
+    function renderBoard(listEl) {
+      if (!listEl) return;
+      var myName = '';
+      try { myName = (localStorage.getItem(GAME_NAME_KEY) || '').toLowerCase(); } catch (e) {}
+      if (!gameLB.length) {
+        listEl.innerHTML = '<li class="lb-empty">No scores yet &mdash; be the first!</li>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < gameLB.length; i++) {
+        var me = (myName && String(gameLB[i].name).toLowerCase() === myName) ? ' me' : '';
+        html += '<li class="lb-row"><span class="lb-rank">' + (i + 1) +
+          '</span><span class="lb-name' + me + '"></span>' +
+          '<span class="lb-meters"><span class="lb-mv"></span><span class="unit">m</span></span></li>';
+      }
+      listEl.innerHTML = html;
+      // Fill names via textContent (never innerHTML) so player names can't inject markup.
+      var rows = listEl.querySelectorAll('.lb-row');
+      for (var j = 0; j < rows.length; j++) {
+        rows[j].querySelector('.lb-name').textContent = gameLB[j].name;
+        rows[j].querySelector('.lb-mv').textContent = Number(gameLB[j].meters || 0).toLocaleString();
+      }
+    }
+
+    function setupGame(root) {
+      var G = window.GameSim;
+      var W = G.W, H = G.H, BOAT_X = W * G.BOAT_X_FRAC, UPM = G.UNITS_PER_METER;
+
+      var canvas = root.querySelector('.game-canvas');
+      var stage = root.querySelector('.game-stage');
+      var hudM = root.querySelector('.game-hud-m');
+      var startOv = root.querySelector('.game-start');
+      var overOv = root.querySelector('.game-over');
+      var startBtn = root.querySelector('.game-start-btn');
+      var saveBtn = root.querySelector('.game-save-btn');
+      var againBtn = root.querySelector('.game-again-btn');
+      var nameInput = root.querySelector('.game-name');
+      var bestEl = root.querySelector('.game-best');
+      var overM = root.querySelector('.game-over-m');
+      var overTitle = root.querySelector('.game-over-title');
+      var msgEl = root.querySelector('.game-msg');
+
+      var DPR = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = W * DPR; canvas.height = H * DPR;
+      var ctx = canvas.getContext('2d');
+      ctx.scale(DPR, DPR);
+
+      var state = null, seed = 0, pressed = false, lastPressed = false;
+      var toggles = [], acc = 0, lastT = 0, raf = 0, running = false, playing = false;
+      var finalMeters = 0, wake = [], idleX = 0, idleFrame = 0;
+      var tiltDisp = 0, kick = 0;
+      var submitting = false, submitted = false;
+      var CRASH_TITLES = ['Caught a crab!', 'Into the reeds!', 'Beached it!', 'Splash!', 'Bank shot!'];
+
+      function press(v) {
+        if (v && !pressed) kick -= 0.16;   // little bow-up nod on each catch
+        pressed = v;
+      }
+
+      function refreshBest() {
+        var pb = 0; try { pb = parseInt(localStorage.getItem(GAME_BEST_KEY) || '0', 10) || 0; } catch (e) {}
+        bestEl.textContent = pb > 0 ? ('Your best: ' + Number(pb).toLocaleString() + ' m') : '';
+      }
+
+      function enter() {
+        playing = false;
+        if (!state || state.crashed) state = G.makeState(2025); // gentle preview course
+        overOv.classList.add('hidden');
+        startOv.classList.remove('hidden');
+        refreshBest();
+        idleX = 0; wake = []; tiltDisp = 0; kick = 0;
+        ensureLoop();
+      }
+      function leave() {
+        playing = false; running = false;
+        if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      }
+
+      function start() {
+        seed = (Math.floor(Math.random() * 4294967296)) >>> 0;
+        try { if (window.crypto && crypto.getRandomValues) { var a = new Uint32Array(1); crypto.getRandomValues(a); seed = a[0] >>> 0; } } catch (e) {}
+        state = G.makeState(seed);
+        pressed = false; lastPressed = false; toggles = [];
+        acc = 0; wake = []; tiltDisp = 0; kick = 0; finalMeters = 0;
+        playing = true;
+        startOv.classList.add('hidden');
+        overOv.classList.add('hidden');
+        lastT = performance.now();
+        ensureLoop();
+      }
+
+      function tickOnce() {
+        if (pressed !== lastPressed) { toggles.push(state.tick); lastPressed = pressed; }
+        G.step(state, pressed);
+        wake.push({ wx: state.x - 26, wy: state.y + 2 });
+        if (wake.length > 140) wake.shift();
+      }
+
+      function gameOver() {
+        playing = false;
+        finalMeters = Math.floor(state.x / UPM);
+        overM.textContent = Number(finalMeters).toLocaleString();
+        var pb = 0; try { pb = parseInt(localStorage.getItem(GAME_BEST_KEY) || '0', 10) || 0; } catch (e) {}
+        if (finalMeters > pb) {
+          try { localStorage.setItem(GAME_BEST_KEY, String(finalMeters)); } catch (e) {}
+          overTitle.textContent = 'New personal best!';
+        } else {
+          overTitle.textContent = CRASH_TITLES[Math.floor(Math.random() * CRASH_TITLES.length)];
+        }
+        submitted = false; submitting = false;
+        saveBtn.disabled = false; saveBtn.textContent = 'Save score'; msgEl.textContent = '';
+        try { var n = localStorage.getItem(GAME_NAME_KEY); if (n && !nameInput.value) nameInput.value = n; } catch (e) {}
+        overOv.classList.remove('hidden');
+      }
+
+      function submitScore() {
+        if (submitting || submitted) return;
+        var name = (nameInput.value || '').trim();
+        if (!name) { msgEl.textContent = 'Enter a name to save.'; nameInput.focus(); return; }
+        submitting = true; saveBtn.disabled = true; saveBtn.textContent = 'Saving\u2026'; msgEl.textContent = '';
+        try { localStorage.setItem(GAME_NAME_KEY, name); } catch (e) {}
+        fetch(PG_API + '/game-run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, seed: seed, inputTicks: toggles, clientMeters: finalMeters, courseVersion: G.COURSE_VERSION })
+        }).then(function (r) {
+          return r.json().catch(function () { return null; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; });
+        }).then(function (res) {
+          submitting = false;
+          if (res.ok && res.j) {
+            submitted = true; saveBtn.textContent = 'Saved!';
+            var m = Number(res.j.meters || 0);
+            msgEl.textContent = res.j.best ? ('New best on the board \u2014 ' + m.toLocaleString() + ' m!') : ('Saved: ' + m.toLocaleString() + ' m');
+            renderAllBoards();
+            gameFetchLeaderboard();
+          } else if (res.status === 409) {
+            saveBtn.disabled = false; saveBtn.textContent = 'Save score';
+            msgEl.textContent = 'Game was updated \u2014 please refresh the page.';
+          } else {
+            saveBtn.disabled = false; saveBtn.textContent = 'Save score';
+            msgEl.textContent = 'Could not save. Try again.';
+          }
+        }).catch(function () {
+          submitting = false; saveBtn.disabled = false; saveBtn.textContent = 'Save score';
+          msgEl.textContent = 'Network error. Try again.';
+        });
+      }
+
+      // ---------- loop ----------
+      function ensureLoop() {
+        if (running) return;
+        running = true; lastT = performance.now();
+        raf = requestAnimationFrame(loop);
+      }
+      function loop(t) {
+        if (!running) return;
+        var dt = (t - lastT) / 1000; lastT = t;
+        if (dt > 0.1) dt = 0.1;
+        if (playing) {
+          acc += dt;
+          var steps = 0;
+          while (acc >= G.DT && steps < 6) {
+            tickOnce(); acc -= G.DT; steps++;
+            if (state.crashed) break;
+          }
+          if (state.crashed) { draw(); gameOver(); raf = requestAnimationFrame(loop); return; }
+        } else {
+          idleX += dt * 66; idleFrame += 1;
+          wake.push({ wx: idleX - 26 + BOAT_X, wy: idleBoatY() + 2 });
+          if (wake.length > 90) wake.shift();
+        }
+        draw();
+        raf = requestAnimationFrame(loop);
+      }
+
+      function idleBoatY() {
+        var c = state.course.boundsAt(idleX + BOAT_X).center;
+        return c + Math.sin(idleX * 0.018) * 12;
+      }
+
+      // ---------- drawing (all cosmetic) ----------
+      function sx(wx, camX) { return wx - (camX - BOAT_X); }
+
+      function draw() {
+        var camX, boatY, boatTick, vy;
+        if (playing || (state && state.crashed)) {
+          camX = state.x; boatY = state.y; boatTick = state.tick; vy = state.vy;
+        } else {
+          camX = idleX + BOAT_X; boatY = idleBoatY(); boatTick = idleFrame; vy = Math.cos(idleX * 0.018) * 1.2;
+        }
+        var course = state.course;
+
+        // water background
+        var wg = ctx.createLinearGradient(0, 0, 0, H);
+        wg.addColorStop(0, '#dceff4'); wg.addColorStop(1, '#a9d4e0');
+        ctx.fillStyle = wg; ctx.fillRect(0, 0, W, H);
+        // subtle ripple lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2;
+        for (var ry = 60; ry < H; ry += 46) {
+          var off = ((camX * 0.5 + ry * 3) % 60);
+          ctx.beginPath();
+          for (var rx = -60 + off; rx < W; rx += 60) { ctx.moveTo(rx, ry); ctx.lineTo(rx + 26, ry); }
+          ctx.stroke();
+        }
+
+        // banks (top + bottom land) sampled across the screen
+        var camL = camX - BOAT_X;
+        drawBank(course, camL, true);
+        drawBank(course, camL, false);
+
+        // buoys / rock outcrops
+        var blocks = course.blocksInRange(camL, camL + W);
+        for (var i = 0; i < blocks.length; i++) drawBlock(blocks[i], camX);
+
+        // wake, then boat
+        drawWake(camX);
+        drawBoat(BOAT_X, boatY, boatTick, vy, playing);
+
+        if (playing) hudM.textContent = Math.floor(state.x / UPM).toLocaleString();
+      }
+
+      function drawBank(course, camL, top) {
+        var samp = 9;
+        ctx.beginPath();
+        if (top) ctx.moveTo(0, 0); else ctx.moveTo(0, H);
+        var edgeY = [];
+        for (var s = 0; s <= W; s += samp) {
+          var b = course.boundsAt(camL + s);
+          var y = top ? b.ceil : b.floor;
+          edgeY.push([s, y]);
+          ctx.lineTo(s, y);
+        }
+        ctx.lineTo(W, top ? 0 : H);
+        ctx.closePath();
+        var bg = ctx.createLinearGradient(0, top ? 0 : H, 0, top ? edgeAvg(edgeY) : edgeAvg(edgeY));
+        ctx.fillStyle = top ? '#c9b98c' : '#c2b083';
+        ctx.fill();
+        // grassy waterline edge
+        ctx.beginPath();
+        for (var k = 0; k < edgeY.length; k++) { if (k === 0) ctx.moveTo(edgeY[k][0], edgeY[k][1]); else ctx.lineTo(edgeY[k][0], edgeY[k][1]); }
+        ctx.strokeStyle = '#8fae5f'; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2; ctx.stroke();
+      }
+      function edgeAvg(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i][1]; return s / a.length; }
+
+      function drawBlock(b, camX) {
+        var x = sx(b.x, camX), w = b.w;
+        var midx = x + w / 2;
+        // rock/jetty in bank color
+        ctx.fillStyle = b.top ? '#b6a677' : '#ab9a6d';
+        roundRect(x, b.y0, w, b.y1 - b.y0, 7); ctx.fill();
+        ctx.strokeStyle = '#8fae5f'; ctx.lineWidth = 3; ctx.stroke();
+        // orange buoy at the tip that juts into the water
+        var tipY = b.top ? b.y1 : b.y0;
+        ctx.beginPath(); ctx.arc(midx, tipY, w * 0.62, 0, Math.PI * 2);
+        ctx.fillStyle = '#f3722b'; ctx.fill();
+        ctx.strokeStyle = '#c2531a'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(midx - w * 0.18, tipY - w * 0.18, w * 0.16, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fill();
+      }
+
+      function drawWake(camX) {
+        for (var i = 0; i < wake.length; i++) {
+          var p = wake[i];
+          var x = sx(p.wx, camX);
+          if (x < -20 || x > BOAT_X + 5) continue;
+          var age = i / wake.length;              // 0 old .. 1 recent
+          var r = 2 + age * 7;
+          ctx.beginPath(); ctx.ellipse(x, p.wy, r + 3, r, 0, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,' + (0.05 + age * 0.28) + ')';
+          ctx.fill();
+        }
+      }
+
+      function drawBoat(bx, by, tick, vy, isPlay) {
+        // eased tilt from vertical velocity + decaying catch kick
+        var target = vy * 0.05; if (target > 0.34) target = 0.34; else if (target < -0.34) target = -0.34;
+        kick *= 0.86; target += kick;
+        tiltDisp += (target - tiltDisp) * 0.2;
+
+        var phase = tick * 0.13;
+        var sweep = Math.sin(phase);
+        var slide = Math.cos(phase) * 3;
+
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.rotate(tiltDisp);
+
+        // far oar (faint)
+        drawOar(phase + Math.PI, 'rgba(60,50,40,0.4)', 'rgba(180,170,150,0.5)', 0.8);
+        // hull (needle shell)
+        ctx.fillStyle = '#2f2a25';
+        ctx.beginPath();
+        ctx.moveTo(-42, 0);
+        ctx.quadraticCurveTo(-30, -8, 40, -3);
+        ctx.quadraticCurveTo(54, 0, 40, 3);
+        ctx.quadraticCurveTo(-30, 8, -42, 0);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#5a4a3a';
+        ctx.beginPath(); ctx.ellipse(-2, -1, 30, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+        // rower (slides fore/aft)
+        ctx.save(); ctx.translate(slide, 0);
+        ctx.fillStyle = '#c0431f';
+        ctx.beginPath(); ctx.ellipse(0, -8, 6, 8, 0, 0, Math.PI * 2); ctx.fill(); // torso
+        ctx.fillStyle = '#e9c9a0';
+        ctx.beginPath(); ctx.arc(0, -17, 4.2, 0, Math.PI * 2); ctx.fill();        // head
+        ctx.restore();
+        // near oar (over the rower)
+        drawOar(phase, '#3a3128', '#efe3c4', 1);
+
+        // catch splash when the blade bites
+        if (sweep > 0.82) {
+          ctx.beginPath(); ctx.arc(14, 15, 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawOar(phase, shaft, blade, scale) {
+        var ox = 3, oy = -7;               // rigger pivot
+        var bx = ox + Math.cos(phase) * 30 * scale;
+        var byv = oy + 15 + Math.sin(phase) * 12 * scale;
+        ctx.strokeStyle = shaft; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(bx, byv); ctx.stroke();
+        ctx.save(); ctx.translate(bx, byv); ctx.rotate(phase);
+        ctx.fillStyle = blade;
+        ctx.beginPath(); ctx.ellipse(0, 0, 7 * scale, 3.4 * scale, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+
+      function roundRect(x, y, w, h, r) {
+        if (h < 0) { y = y + h; h = -h; }
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+      }
+
+      // ---------- input ----------
+      stage.addEventListener('pointerdown', function (e) {
+        if (!overOv.classList.contains('hidden')) return;         // game-over screen: use buttons
+        if (e.target.closest('.game-btn, .game-name')) return;    // let controls handle themselves
+        e.preventDefault();
+        if (!startOv.classList.contains('hidden')) { start(); press(true); }
+        else if (playing) { press(true); }
+      });
+      var release = function () { press(false); };
+      stage.addEventListener('pointerup', release);
+      stage.addEventListener('pointercancel', release);
+      stage.addEventListener('pointerleave', release);
+
+      document.addEventListener('keydown', function (e) {
+        if (e.code !== 'Space' && e.key !== ' ') return;
+        if (!visible() || !overOv.classList.contains('hidden')) return;
+        e.preventDefault();
+        if (!startOv.classList.contains('hidden')) { start(); press(true); }
+        else if (playing) { press(true); }
+      });
+      document.addEventListener('keyup', function (e) {
+        if (e.code !== 'Space' && e.key !== ' ') return;
+        if (!visible()) return;
+        press(false);
+      });
+
+      startBtn.addEventListener('click', function () { start(); });
+      againBtn.addEventListener('click', function () { start(); });
+      saveBtn.addEventListener('click', function () { submitScore(); });
+      nameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); submitScore(); } });
+
+      function visible() { return canvas.offsetParent !== null; }
+
+      return { visible: visible, enter: enter, leave: leave };
+    }
 
     // Per-photo focal point (CSS object-position) so off-center people aren't
     // cropped out of the "cover"-fit swipe cards. Generated from Apple Vision
@@ -3453,7 +4215,8 @@
         'travel': 'Hotels & Travel',
         'things': 'Things to Do',
         'rsvp': 'RSVP',
-        'registry': 'Our Registry'
+        'registry': 'Our Registry',
+        'game': 'Row the Charles'
       };
       
       // Hide all sections
@@ -3519,6 +4282,14 @@
         } else {
           mainContent.classList.remove('travel-page-active');
         }
+        // Game page (start/stop the animation loop as you enter/leave)
+        if (sectionId === 'game') {
+          mainContent.classList.add('game-page-active');
+          gameEnter();
+        } else {
+          mainContent.classList.remove('game-page-active');
+          gameLeave();
+        }
         // Home page (controls the mobile top-bar brand mark)
         if (sectionId === 'home') {
           mainContent.classList.add('home-page-active');
@@ -3560,7 +4331,8 @@
         'travel': 'Hotels & Travel',
         'things': 'Things to Do',
         'rsvp': 'RSVP',
-        'registry': 'Our Registry'
+        'registry': 'Our Registry',
+        'game': 'Row the Charles'
       };
       
       document.querySelectorAll('.page-section').forEach(section => {
@@ -3622,6 +4394,14 @@
           mainContent.classList.add('travel-page-active');
         } else {
           mainContent.classList.remove('travel-page-active');
+        }
+        // Game page (start/stop the animation loop as you enter/leave)
+        if (sectionId === 'game') {
+          mainContent.classList.add('game-page-active');
+          gameEnter();
+        } else {
+          mainContent.classList.remove('game-page-active');
+          gameLeave();
         }
         // Home page (controls the mobile top-bar brand mark)
         if (sectionId === 'home') {
