@@ -2192,6 +2192,24 @@
     .lb-meters { font-weight: 700; font-variant-numeric: tabular-nums; }
     .lb-meters .unit { font-size: .8em; opacity: .6; margin-left: 2px; font-weight: 600; }
     .lb-empty { text-align: center; opacity: .55; padding: 16px; }
+
+    /* Mobile: give the game as much room as possible (full-bleed, tall stage) */
+    @media (max-width: 768px) {
+      .game-page-active .mobile-scroll-container .site-header { display: none; }
+      .game-root { max-width: none; }
+      .game-intro { margin-bottom: 8px; }
+      .game-intro h2 { font-size: 1.7rem; margin: 2px 0 4px; }
+      .game-sub { display: none; }
+      .game-stage {
+        max-width: none;
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+        aspect-ratio: auto;
+        height: 74dvh;
+        border-radius: 0;
+      }
+      .game-board { padding: 0 16px; }
+    }
   </style>
 </head>
 <body>
@@ -2273,38 +2291,43 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var COURSE_VERSION = 1;
+  var COURSE_VERSION = 2;
 
-  // ---- Logical world / render size (world units == canvas logical px) ----
-  var W = 900;            // logical canvas width
-  var H = 600;            // logical canvas height
-  var BOAT_X_FRAC = 0.30; // boat's fixed horizontal screen position (fraction of W)
-  var BOAT_HW = 30;       // boat hull half-width  (collision)
-  var BOAT_HH = 9;        // boat hull half-height (collision)
+  // ---- Logical world (world units; render scales to fit the stage) ----
+  var W = 900;            // reference width  (desktop shows ~this many world units)
+  var H = 600;            // world channel height (always fully visible vertically)
+  var BOAT_X_FRAC = 0.28; // boat's fixed horizontal screen position (fraction of view)
+  var BOAT_HW = 28;       // boat hull half-width  (collision)
+  var BOAT_HH = 8;        // boat hull half-height (collision)
 
   // ---- Physics (per fixed tick; DT is informational, constants fold it in) ----
+  // Faster than v1: quicker start, snappier horizontal + vertical movement.
   var DT = 1 / 60;
-  var GRAV = 0.16;          // downward accel when NOT pressed
-  var LIFT = 0.34;          // upward accel when pressed (net -0.18 while held)
-  var VY_MAX = 5.0;         // terminal vertical speed
-  var SPEED0 = 2.7;         // starting forward speed (units/tick)
-  var SPEED_RAMP = 0.00005; // forward speed gained per world unit travelled
-  var SPEED_MAX = 6.2;
+  var GRAV = 0.22;          // downward accel when NOT pressed
+  var LIFT = 0.46;          // upward accel when pressed (net -0.24 while held)
+  var VY_MAX = 6.4;         // terminal vertical speed
+  var SPEED0 = 3.7;         // starting forward speed (units/tick) -- starts fast
+  var SPEED_RAMP = 0.00004; // forward speed gained per world unit travelled
+  var SPEED_MAX = 7.4;
 
   // ---- Course geometry ----
-  var SEG_W = 70;         // world units per block segment
+  var SEG_W = 70;         // world units per obstacle segment
   var ANCHOR_SEG = 6;     // cave-center anchors spaced every ANCHOR_SEG segments
-  // (wide spacing keeps the cave's vertical slope followable by the boat)
-  var CENTER_MIN = 170;   // min cave-center Y
-  var CENTER_SPAN = 230;  // cave center ranges CENTER_MIN .. CENTER_MIN+CENTER_SPAN
-  var START_GAP = 360;    // vertical gap between ceiling & floor at the start
+  // (wide spacing keeps the channel's vertical slope followable by the boat)
+  var CENTER_MIN = 170;   // min channel-center Y
+  var CENTER_SPAN = 230;  // channel center ranges CENTER_MIN .. CENTER_MIN+CENTER_SPAN
+  var START_GAP = 360;    // vertical gap between banks at the start
   var MIN_GAP = 205;      // gap floor once fully narrowed
   var NARROW = 0.9;       // gap lost per segment travelled
-  var SAFE_SEG = 14;      // no blocks before this segment (orientation grace)
-  var BLOCK_EVERY = 3;    // only every Nth segment may hold a block (guarantees
-  // >= (BLOCK_EVERY-1)*SEG_W spacing, so no impossible opposite-side pinches)
-  var BLOCK_PROB = 0.55;  // chance an eligible segment spawns a jutting block
-  var BLOCK_W = 26;       // block width (world units)
+  var SAFE_SEG = 12;      // no obstacles before this segment (orientation grace)
+  var OBST_EVERY = 3;     // only every Nth segment may hold an obstacle (guarantees
+  // >= (OBST_EVERY-1)*SEG_W spacing, so no impossible back-to-back pinches)
+  var OBST_PROB = 0.6;    // chance an eligible segment spawns an obstacle
+
+  // Obstacle sizes (world units)
+  var ROCK_W = 30;        // bank-attached rock cluster
+  var BOAT_OW = 54, BOAT_OH = 18; // another boat, free-floating mid-channel
+  var BRIDGE_W = 30;      // bridge piers (barrier with a central arch gap)
 
   // Cap replay/record length (~8 min at 60fps) to bound Lambda compute.
   var MAX_TICKS = 60 * 60 * 8;
@@ -2349,49 +2372,91 @@
       return { ceil: center - half, floor: center + half, center: center, gap: gap };
     }
 
-    // A jutting block for segment k, or null. Deterministic from (seed, k).
-    function blockAt(k) {
+    // The obstacle for segment k, or null. Deterministic from (seed, k). Each
+    // obstacle exposes a `type` (for rendering) and one or more collision
+    // rectangles `rects` (AABBs the boat hull must avoid).
+    //   rock   : one rectangle jutting from the top OR bottom bank
+    //   boat   : one small rectangle free-floating mid-channel (row around it)
+    //   bridge : two pier rectangles (top + bottom) with a central arch gap
+    function obstacleAt(k) {
       if (k < SAFE_SEG) return null;
-      if (k % BLOCK_EVERY !== 0) return null; // enforce spacing between blocks
-      if (hash01(seed, k, 1) >= BLOCK_PROB) return null;
-      var midx = k * SEG_W + SEG_W * 0.5;
-      var bnd = boundsAt(midx);
-      var top = hash01(seed, k, 2) < 0.5;
-      var pen = bnd.gap * (0.26 + hash01(seed, k, 4) * 0.26); // reach into the gap (<= ~half)
-      var bx = k * SEG_W + hash01(seed, k, 3) * (SEG_W - BLOCK_W);
-      var y0, y1;
-      if (top) { y0 = bnd.ceil; y1 = bnd.ceil + pen; }
-      else { y1 = bnd.floor; y0 = bnd.floor - pen; }
-      return { x: bx, w: BLOCK_W, y0: y0, y1: y1, top: top };
+      if (k % OBST_EVERY !== 0) return null;  // enforce spacing between obstacles
+      if (hash01(seed, k, 1) >= OBST_PROB) return null;
+
+      var segx = k * SEG_W;
+      var bnd = boundsAt(segx + SEG_W * 0.5);
+      var typeR = hash01(seed, k, 2);
+
+      if (typeR < 0.55) {
+        var top = hash01(seed, k, 3) < 0.5;
+        var pen = bnd.gap * (0.22 + hash01(seed, k, 4) * 0.24);
+        var rx = segx + hash01(seed, k, 5) * (SEG_W - ROCK_W);
+        var rect = top
+          ? { x: rx, w: ROCK_W, y0: bnd.ceil, y1: bnd.ceil + pen }
+          : { x: rx, w: ROCK_W, y0: bnd.floor - pen, y1: bnd.floor };
+        return { type: 'rock', top: top, rects: [rect] };
+      }
+
+      if (typeR < 0.8) {
+        var lo = bnd.ceil + 20 + BOAT_OH * 0.5;
+        var hi = bnd.floor - 20 - BOAT_OH * 0.5;
+        if (hi <= lo) return null;
+        var cy = lo + hash01(seed, k, 4) * (hi - lo);
+        var bx = segx + hash01(seed, k, 5) * (SEG_W - BOAT_OW);
+        return {
+          type: 'boat', cx: bx + BOAT_OW * 0.5, cy: cy,
+          rects: [{ x: bx, w: BOAT_OW, y0: cy - BOAT_OH * 0.5, y1: cy + BOAT_OH * 0.5 }]
+        };
+      }
+
+      // bridge
+      var gapH = 150 + hash01(seed, k, 4) * 26;
+      if (gapH > bnd.gap - 24) gapH = bnd.gap - 24;
+      if (gapH < 118) gapH = 118;
+      var glo = bnd.ceil + gapH * 0.5 + 6;
+      var ghi = bnd.floor - gapH * 0.5 - 6;
+      var gc = ghi > glo ? glo + hash01(seed, k, 6) * (ghi - glo) : (bnd.ceil + bnd.floor) * 0.5;
+      var px = segx + (SEG_W - BRIDGE_W) * 0.5;
+      var gapTop = gc - gapH * 0.5, gapBot = gc + gapH * 0.5;
+      return {
+        type: 'bridge', gapTop: gapTop, gapBot: gapBot,
+        rects: [
+          { x: px, w: BRIDGE_W, y0: bnd.ceil - 60, y1: gapTop },
+          { x: px, w: BRIDGE_W, y0: gapBot, y1: bnd.floor + 60 }
+        ]
+      };
     }
 
-    // Blocks whose x-span could touch a boat hull centered near world-x.
-    function blocksNear(x) {
+    // Obstacles whose x-span could touch a boat hull centered near world-x.
+    function obstaclesNear(x) {
       var out = [];
       var k0 = Math.floor((x - BOAT_HW - SEG_W) / SEG_W);
       var k1 = Math.floor((x + BOAT_HW) / SEG_W);
       for (var k = k0; k <= k1; k++) {
         if (k < 0) continue;
-        var b = blockAt(k);
-        if (b) out.push(b);
+        var o = obstacleAt(k);
+        if (o) out.push(o);
       }
       return out;
     }
 
-    // All blocks with any part in [x0, x1] (for rendering).
-    function blocksInRange(x0, x1) {
+    // All obstacles with any part in [x0, x1] (for rendering).
+    function obstaclesInRange(x0, x1) {
       var out = [];
       var k0 = Math.floor(x0 / SEG_W) - 1;
       var k1 = Math.floor(x1 / SEG_W) + 1;
       for (var k = k0; k <= k1; k++) {
         if (k < 0) continue;
-        var b = blockAt(k);
-        if (b && b.x + b.w >= x0 && b.x <= x1) out.push(b);
+        var o = obstacleAt(k);
+        if (!o) continue;
+        for (var i = 0; i < o.rects.length; i++) {
+          if (o.rects[i].x + o.rects[i].w >= x0 && o.rects[i].x <= x1) { out.push(o); break; }
+        }
       }
       return out;
     }
 
-    return { boundsAt: boundsAt, blocksNear: blocksNear, blocksInRange: blocksInRange };
+    return { boundsAt: boundsAt, obstaclesNear: obstaclesNear, obstaclesInRange: obstaclesInRange };
   }
 
   function makeState(seed) {
@@ -2420,13 +2485,16 @@
       state.crashed = true;
       return state;
     }
-    var blocks = state.course.blocksNear(state.x);
-    for (var i = 0; i < blocks.length; i++) {
-      var bl = blocks[i];
-      if (state.x + BOAT_HW > bl.x && state.x - BOAT_HW < bl.x + bl.w &&
-          state.y + BOAT_HH > bl.y0 && state.y - BOAT_HH < bl.y1) {
-        state.crashed = true;
-        return state;
+    var obs = state.course.obstaclesNear(state.x);
+    for (var i = 0; i < obs.length; i++) {
+      var rects = obs[i].rects;
+      for (var j = 0; j < rects.length; j++) {
+        var r = rects[j];
+        if (state.x + BOAT_HW > r.x && state.x - BOAT_HW < r.x + r.w &&
+            state.y + BOAT_HH > r.y0 && state.y - BOAT_HH < r.y1) {
+          state.crashed = true;
+          return state;
+        }
       }
     }
     return state;
@@ -2468,7 +2536,7 @@
     // This properly handles iOS keyboard open/close without JavaScript manipulation
     
     // Encrypted wedding content (generated by build.js)
-    const ENCRYPTED_DATA = '{"salt":"c42e68554c8b1fe32b5c9b87d93bc7d7","iv":"6ccff603b98d0468854080b6f5c75de4","authTag":"6e28804fe991ffcb5d31d4a5d19a3ac4","content":"c4c42b02c7654646f781c25042f89a93a706c28c1902e21d16af35d6c65ef6dadb5f1a902e254f0f617ea30a217d5025fdba3ec044b4909e75030535b03f7f21e5aa1a5a1e8198c5bc2952808f789f6b57699bc22c516930496cf47927932451ac85a912d0cb64244f198bc856d1b624b9dbfa0540c356ca5688c324813b6442209ea7551b227634faab64416851792b2b1a506f7796a7d70dd20af4269c1129820ae300fd8726beafe2b6da2f6967ec7b3c3eab44268fd22ffd07c1611a164e6b9e85182ac9f5d1f8527ecb7aff5302d3db50d103fe236159eb229ccfb6d84042a7cf1664a47042e2cde57bfb60001027dc8f4bd16dc7b350a019969557be35a93f12bc14ac14b32edf3803f9cf6a6c81bf85c39ff657d65c6ea5316b4735416f7e03275c315616e36f858d8cdc2b2384d2aef4315bff09bfa5808ab2073610e39e0d12b1e07ce5992aa9fed9a07c6a4b8548f9b1ec7bb4df26d55ecfc4d13db44d64690f130aca6558b8f3a4cc6b50b79fd9fb127a1097e0140fd59104f23176abdcb70f3f0372c8387eee7644cd8ebc21560dea67533b1a7d5753d01797ec107c933f6ffe01ce772d577b0e0a1124b8a4c7d2335fb89c51237734f8b99c889ac3e59a9f8c14413965751e1dbf9bbfcb51ec38a88ccf54e554922ecd9e1fc749a6f2fff4c748ebeb221b20030dc2e729df011829c170e3cff2dc365e4e75e1c2e252a365ad22980db8e13828fa3cd7316a81f44b9519313659cf2186afb75b75fa14026f99c3d71eb1611900150944edea1ccd522b74cdcff3a5a8d6639df20fad688ecd5e530cc4f53b6b04dec694eb3662de927e30fe2d27771200a8060ad80b2574a5e44dc04298611c1a3ac1e61d025f467027eb38749f50a5d9773e16be7b204eccd12abb0aa8ec4cfeb88d564f9e9f9cfaff00e667869d57ab4188780493af937766829d339a1d7e6a682907fbb572b64ade8ab3fb18584297e611116323722b04138fba1d019dfea4f967debc88cdc03413cf563adfe8cf1887603b51119052f23492c5ec4ffbc5aa2dd94157420880c13c38e7f6b7978b96ac6fac9bf55b7cd732cdd87a0932acefb4dc669ce718702717b90a65aa92da83d9a618fb9fe193095e0615faaaf8912353f48ff8f5a563ff5a02906998baa12d08bb412cfaf6d882030fdf024e9e31590e1f545b2ceb853ad1e78da67d9e36a7e7a7539b58d859b94a8adefeb30304bcd502df8b77753e5467d011b1adb316d9dec5d2f669b27efac63e8b9658a84972a0abc480cd8168af8236c4178c2f7fc5a0d616b668d0a757505f73b7d91c85cba30dac0ae1fc816332ec18ee8680e15979b29cdd555ec9c7fdeab5c74fdf500915a110939b348747cc918126553d2ba4e2546b8fc3e68a6af16c3c499cc6033f98fcc6efca4eb0a64893ecd962895f3f59a563422272279b67e371e5dd1ceed90874"}';
+    const ENCRYPTED_DATA = '{"salt":"2dff1506fc9615aa2b4ef6ad10a58112","iv":"b511f508f9465a9cda62c2991a0cf702","authTag":"3c0f22ba2c86402f8f443212ce78513c","content":"b79f826c2a8caaca68481e038a153dc8d652baa61fe81d820d1a390306f16a3087689e990260947b8ac396f0978ed588b04386830a55e7baee26c307c05b3ba14038b4d554d2c4a852ecbbcdfceaeb402e21b22cecc7cb8953bb2b0da25ffcf4f45a5093d8000043820feb3b02f5b8c606c5f4d25f6df6ca7c1574f28e03aef460d7a9a8165333d7d9fe386f4222ba4730c55e69d13e4ab3eb2a83c897e499fa6d9ec13008e9463c9f572b792d4723a16ec6c626172661c28240ee72d7ffbe48ab67a2485df902ff606f80d89247881b067f4458ffa375670effa95052a627947b2940bd750362a27742581860021a264f588b610046a105ff9988acf847da0ff81b6eb44204d7409d17abf4d4fef139cb59fc8bd694d9d60daa4a1a439af781c8b7f81b1bd572bf7f5c0eacecc5597813da95aee67d7f6cb2524a0f99ac60992644922012ecee5ecb7d0f5de1ad33628032ecf1a0aff3c363ce7ec9d83fe4bf6e0c21ebab3963aa66737a8bb1c96075aa74aa4ff6486d45578a9994a93643841b94ce72ee669e07707445ee9aab756b46067c2346802d5e4c0a21f7370e3d6810da9f8a5004a283e1b6deccfed038ba699e3d77fdad9e02749caf7f86ac9890de1eceec59c2c4d27c0fb162522e09ae6f4f141a4bc560cf64bb3d63614ff6f8a64e95589306321c2f8c24ca5570d737d1a35ef35c32096e63dcbe83f511925eb4bf13b0bd9bf30fd712f3cba8c0eebc245e1efb06894eb67ccb13e11ba9cb27179aeb7b8fb8ef39e3192e0f8c8751aed6709a50cd273340cd8c11f81bb6124d4f61ea341b66c41b0e882bfd0c3b5de80262eb1af8e9736b274a865d224fc00a94f75528a052d0ca6756f3d6e79a175d4c1808b2bb4c287252d8850168d81e94b48e73109166f39e82413b1b593d213040318c3194fec1417fbe00078c1a699ab7d9524bb8c82f44a31b3888136b844c2d00e035a1031143f9624aaac9dd15a319044fb677fba2abba6384f5b47f545ae29ec7811fd320b6eb57ac33a5706a59b04bc828a37ed87eb0f4430236f2db79ceec58c05bfbf3fe03ac099b01cc030b3a81d252451239ad15a75b259bf9212e44add5d748356323a05179e78fa64bd9df7e275845945bf523b7eb7d35dba945689bc6b41a01c9a668265a575efdc76cb9b916e107d6b14950da387eb0790e37363eb9b2fe2fb6e9f2efe9774b88df38d817cc19856d39ff2c31d8eaaf33b84aba69b1e0ad255fd068cf02767c86e175ed1db07c8d02726f748219743f673fc43195216f9ebe192fb3e509b3fc3ef394939d1ce0541c1b6c3f830114e552f818a0b05d996c1b094b1551304433fe180490dca1f573acdaab84d26b943c287f4994dd03b532124e4d8856cb9484423dcfcf96b53b860747059a641557f3fa6fed14c159d22028fc601416b77b2a11082683c0f6f5d5cee6af32708434a1399f"}';
 
     // Hold the password box behind a "Loading…" state until the background
     // video has painted its first frame (or we time out / it errors), so the
@@ -3015,14 +3083,14 @@
             <div class="game-intro">
               <div class="kicker">just for fun</div>
               <h2>Row the Charles</h2>
-              <p class="game-sub">Click &amp; hold to row up, release to drift down. Dodge the banks and buoys and see how far you can row.</p>
+              <p class="game-sub">Click &amp; hold to row up, release to drift down. Dodge the banks, rocks, bridges and other boats, and see how far you can row.</p>
             </div>
             <div class="game-stage">
               <canvas class="game-canvas" width="900" height="600"></canvas>
               <div class="game-hud"><span class="game-hud-m">0</span><span class="unit">m</span></div>
               <div class="game-overlay game-start">
                 <h3>Row the Charles</h3>
-                <p>Click &amp; hold (or press Space) to row up. Release to drift down. Avoid the banks and the buoys.</p>
+                <p>Click &amp; hold (or press Space) to row up. Release to drift down. Avoid the banks, rocks, bridges and other boats.</p>
                 <button type="button" class="game-btn game-start-btn">Start rowing</button>
                 <div class="game-best"></div>
               </div>
@@ -3373,7 +3441,7 @@
 
     function setupGame(root) {
       var G = window.GameSim;
-      var W = G.W, H = G.H, BOAT_X = W * G.BOAT_X_FRAC, UPM = G.UNITS_PER_METER;
+      var W = G.W, H = G.H, BOAT_FRAC = G.BOAT_X_FRAC, UPM = G.UNITS_PER_METER;
 
       var canvas = root.querySelector('.game-canvas');
       var stage = root.querySelector('.game-stage');
@@ -3389,10 +3457,20 @@
       var overTitle = root.querySelector('.game-over-title');
       var msgEl = root.querySelector('.game-msg');
 
-      var DPR = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = W * DPR; canvas.height = H * DPR;
       var ctx = canvas.getContext('2d');
-      ctx.scale(DPR, DPR);
+      var DPR = Math.min(window.devicePixelRatio || 1, 2);
+      // Adaptive sizing: the canvas fills whatever size the stage is (large on
+      // mobile). We always show the full channel height (H) and scale uniformly,
+      // so there's no distortion; the visible world WIDTH grows/shrinks to fit.
+      var viewW = W, viewH = H, scale = 1, visW = W;
+      function resize() {
+        var w = Math.max(1, Math.round(stage.clientWidth || W));
+        var h = Math.max(1, Math.round(stage.clientHeight || H));
+        viewW = w; viewH = h; scale = h / H; visW = w / scale;
+        canvas.width = Math.round(w * DPR);
+        canvas.height = Math.round(h * DPR);
+      }
+      resize();
 
       var state = null, seed = 0, pressed = false, lastPressed = false;
       var toggles = [], acc = 0, lastT = 0, raf = 0, running = false, playing = false;
@@ -3417,6 +3495,7 @@
         overOv.classList.add('hidden');
         startOv.classList.remove('hidden');
         refreshBest();
+        resize();
         idleX = 0; wake = []; tiltDisp = 0; kick = 0;
         ensureLoop();
       }
@@ -3514,8 +3593,8 @@
           }
           if (state.crashed) { draw(); gameOver(); raf = requestAnimationFrame(loop); return; }
         } else {
-          idleX += dt * 66; idleFrame += 1;
-          wake.push({ wx: idleX - 26 + BOAT_X, wy: idleBoatY() + 2 });
+          idleX += dt * 82; idleFrame += 1;
+          wake.push({ wx: idleX - 26, wy: idleBoatY() + 2 });
           if (wake.length > 90) wake.shift();
         }
         draw();
@@ -3523,158 +3602,229 @@
       }
 
       function idleBoatY() {
-        var c = state.course.boundsAt(idleX + BOAT_X).center;
+        var c = state.course.boundsAt(idleX).center;
         return c + Math.sin(idleX * 0.018) * 12;
       }
 
-      // ---------- drawing (all cosmetic) ----------
-      function sx(wx, camX) { return wx - (camX - BOAT_X); }
-
+      // ---------- drawing (all cosmetic; world-unit coordinate space) ----------
+      // The canvas is transformed so 1 drawing unit == 1 world unit, scaled to
+      // fill the stage height. `camLeftWorld` is the world-x at the left edge.
       function draw() {
-        var camX, boatY, boatTick, vy;
+        var boatWX, boatY, boatTick, vy;
         if (playing || (state && state.crashed)) {
-          camX = state.x; boatY = state.y; boatTick = state.tick; vy = state.vy;
+          boatWX = state.x; boatY = state.y; boatTick = state.tick; vy = state.vy;
         } else {
-          camX = idleX + BOAT_X; boatY = idleBoatY(); boatTick = idleFrame; vy = Math.cos(idleX * 0.018) * 1.2;
+          boatWX = idleX; boatY = idleBoatY(); boatTick = idleFrame; vy = Math.cos(idleX * 0.018) * 1.2;
         }
         var course = state.course;
+        var s = scale;
+        var camLeftWorld = boatWX - BOAT_FRAC * visW;
+        ctx.setTransform(DPR * s, 0, 0, DPR * s, -camLeftWorld * DPR * s, 0);
 
-        // water background
+        var x0 = camLeftWorld, x1 = camLeftWorld + visW;
+
+        // water
         var wg = ctx.createLinearGradient(0, 0, 0, H);
         wg.addColorStop(0, '#dceff4'); wg.addColorStop(1, '#a9d4e0');
-        ctx.fillStyle = wg; ctx.fillRect(0, 0, W, H);
-        // subtle ripple lines
-        ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2;
-        for (var ry = 60; ry < H; ry += 46) {
-          var off = ((camX * 0.5 + ry * 3) % 60);
+        ctx.fillStyle = wg; ctx.fillRect(x0 - 4, 0, visW + 8, H);
+        // drifting ripple ticks
+        ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 2;
+        for (var ry = 40; ry < H; ry += 44) {
+          var off = ((boatWX * 0.4 + ry * 3) % 64);
           ctx.beginPath();
-          for (var rx = -60 + off; rx < W; rx += 60) { ctx.moveTo(rx, ry); ctx.lineTo(rx + 26, ry); }
+          for (var rx = x0 - (x0 % 64) - 64 + off; rx < x1; rx += 64) { ctx.moveTo(rx, ry); ctx.lineTo(rx + 26, ry); }
           ctx.stroke();
         }
 
-        // banks (top + bottom land) sampled across the screen
-        var camL = camX - BOAT_X;
-        drawBank(course, camL, true);
-        drawBank(course, camL, false);
+        drawBank(course, x0, x1, true);
+        drawBank(course, x0, x1, false);
 
-        // buoys / rock outcrops
-        var blocks = course.blocksInRange(camL, camL + W);
-        for (var i = 0; i < blocks.length; i++) drawBlock(blocks[i], camX);
+        var obs = course.obstaclesInRange(x0, x1);
+        for (var i = 0; i < obs.length; i++) drawObstacle(obs[i]);
 
-        // wake, then boat
-        drawWake(camX);
-        drawBoat(BOAT_X, boatY, boatTick, vy, playing);
+        drawWake();
+        drawBoat(boatWX, boatY, boatTick, vy);
 
         if (playing) hudM.textContent = Math.floor(state.x / UPM).toLocaleString();
       }
 
-      function drawBank(course, camL, top) {
-        var samp = 9;
-        ctx.beginPath();
-        if (top) ctx.moveTo(0, 0); else ctx.moveTo(0, H);
-        var edgeY = [];
-        for (var s = 0; s <= W; s += samp) {
-          var b = course.boundsAt(camL + s);
-          var y = top ? b.ceil : b.floor;
-          edgeY.push([s, y]);
-          ctx.lineTo(s, y);
+      function drawBank(course, x0, x1, top) {
+        var samp = visW / 90; if (samp < 6) samp = 6;
+        var pts = [];
+        for (var x = x0; x <= x1 + samp; x += samp) {
+          var b = course.boundsAt(x);
+          pts.push([x, top ? b.ceil : b.floor]);
         }
-        ctx.lineTo(W, top ? 0 : H);
+        ctx.beginPath();
+        ctx.moveTo(x0 - 4, top ? 0 : H);
+        for (var k = 0; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+        ctx.lineTo(x1 + samp, top ? 0 : H);
         ctx.closePath();
-        var bg = ctx.createLinearGradient(0, top ? 0 : H, 0, top ? edgeAvg(edgeY) : edgeAvg(edgeY));
         ctx.fillStyle = top ? '#c9b98c' : '#c2b083';
         ctx.fill();
-        // grassy waterline edge
         ctx.beginPath();
-        for (var k = 0; k < edgeY.length; k++) { if (k === 0) ctx.moveTo(edgeY[k][0], edgeY[k][1]); else ctx.lineTo(edgeY[k][0], edgeY[k][1]); }
+        for (var m = 0; m < pts.length; m++) { if (m === 0) ctx.moveTo(pts[m][0], pts[m][1]); else ctx.lineTo(pts[m][0], pts[m][1]); }
         ctx.strokeStyle = '#8fae5f'; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.stroke();
         ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2; ctx.stroke();
       }
-      function edgeAvg(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i][1]; return s / a.length; }
 
-      function drawBlock(b, camX) {
-        var x = sx(b.x, camX), w = b.w;
-        var midx = x + w / 2;
-        // rock/jetty in bank color
-        ctx.fillStyle = b.top ? '#b6a677' : '#ab9a6d';
-        roundRect(x, b.y0, w, b.y1 - b.y0, 7); ctx.fill();
-        ctx.strokeStyle = '#8fae5f'; ctx.lineWidth = 3; ctx.stroke();
-        // orange buoy at the tip that juts into the water
-        var tipY = b.top ? b.y1 : b.y0;
-        ctx.beginPath(); ctx.arc(midx, tipY, w * 0.62, 0, Math.PI * 2);
-        ctx.fillStyle = '#f3722b'; ctx.fill();
-        ctx.strokeStyle = '#c2531a'; ctx.lineWidth = 2; ctx.stroke();
-        ctx.beginPath(); ctx.arc(midx - w * 0.18, tipY - w * 0.18, w * 0.16, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fill();
+      function drawObstacle(o) {
+        if (o.type === 'rock') drawRock(o);
+        else if (o.type === 'boat') drawOtherBoat(o);
+        else if (o.type === 'bridge') drawBridge(o);
       }
 
-      function drawWake(camX) {
+      function drawRock(o) {
+        var r = o.rects[0];
+        var w = r.w, h = r.y1 - r.y0, cx = r.x + w / 2, cy = (r.y0 + r.y1) / 2;
+        ctx.fillStyle = '#8d8b86';
+        roundRect(r.x, r.y0, w, h, 8); ctx.fill();
+        ctx.strokeStyle = '#5f5d59'; ctx.lineWidth = 2.5; ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.22)';
+        ctx.beginPath(); ctx.ellipse(cx - w * 0.14, o.top ? r.y1 - h * 0.35 : r.y0 + h * 0.35, w * 0.24, h * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.14)';
+        ctx.beginPath(); ctx.ellipse(cx + w * 0.16, cy, w * 0.16, h * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+        // foam where the rock meets the water
+        var tipY = o.top ? r.y1 : r.y0;
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(r.x - 3, tipY); ctx.lineTo(r.x + w + 3, tipY); ctx.stroke();
+      }
+
+      function drawOtherBoat(o) {
+        var r = o.rects[0], w = r.w, h = r.y1 - r.y0;
+        ctx.save();
+        ctx.translate(o.cx, o.cy);
+        // hull, pointed both ends (a passing shell, bow toward us at -x)
+        ctx.fillStyle = '#3b5566';
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.5, 0);
+        ctx.quadraticCurveTo(-w * 0.18, -h * 0.5, w * 0.42, -h * 0.34);
+        ctx.quadraticCurveTo(w * 0.52, 0, w * 0.42, h * 0.34);
+        ctx.quadraticCurveTo(-w * 0.18, h * 0.5, -w * 0.5, 0);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#22343f'; ctx.lineWidth = 2; ctx.stroke();
+        // two rowers
+        ctx.fillStyle = '#d9b25a';
+        ctx.beginPath(); ctx.ellipse(-w * 0.08, 0, 4.5, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(w * 0.12, 0, 4.5, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+        // static oars (both sides)
+        ctx.strokeStyle = '#6b5a45'; ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -h * 0.34); ctx.lineTo(h * 0.5, -h); ctx.moveTo(0, h * 0.34); ctx.lineTo(h * 0.5, h);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawBridge(o) {
+        var r0 = o.rects[0], px = r0.x, w = r0.w;
+        // faint shadow of the deck across the whole river
+        ctx.fillStyle = 'rgba(60,50,40,0.10)';
+        ctx.fillRect(px - 7, 0, w + 14, H);
+        // stone piers (top + bottom) with mortar courses
+        for (var i = 0; i < o.rects.length; i++) {
+          var r = o.rects[i];
+          var y0 = Math.max(r.y0, -4), y1 = Math.min(r.y1, H + 4);
+          ctx.fillStyle = '#b8ab97'; ctx.fillRect(px, y0, w, y1 - y0);
+          ctx.strokeStyle = '#7d7060'; ctx.lineWidth = 2; ctx.strokeRect(px, y0, w, y1 - y0);
+          ctx.strokeStyle = 'rgba(90,80,66,0.5)'; ctx.lineWidth = 1.4;
+          for (var yy = y0 + 12; yy < y1; yy += 14) { ctx.beginPath(); ctx.moveTo(px, yy); ctx.lineTo(px + w, yy); ctx.stroke(); }
+        }
+        // arch lips around the navigable opening
+        ctx.strokeStyle = '#8a7c66'; ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(px, o.gapTop); ctx.quadraticCurveTo(px + w / 2, o.gapTop - 11, px + w, o.gapTop);
+        ctx.moveTo(px, o.gapBot); ctx.quadraticCurveTo(px + w / 2, o.gapBot + 11, px + w, o.gapBot);
+        ctx.stroke();
+      }
+
+      function drawWake() {
         for (var i = 0; i < wake.length; i++) {
           var p = wake[i];
-          var x = sx(p.wx, camX);
-          if (x < -20 || x > BOAT_X + 5) continue;
           var age = i / wake.length;              // 0 old .. 1 recent
           var r = 2 + age * 7;
-          ctx.beginPath(); ctx.ellipse(x, p.wy, r + 3, r, 0, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255,255,255,' + (0.05 + age * 0.28) + ')';
+          ctx.beginPath(); ctx.ellipse(p.wx, p.wy, r + 3, r, 0, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,' + (0.05 + age * 0.26) + ')';
           ctx.fill();
         }
       }
 
-      function drawBoat(bx, by, tick, vy, isPlay) {
-        // eased tilt from vertical velocity + decaying catch kick
-        var target = vy * 0.05; if (target > 0.34) target = 0.34; else if (target < -0.34) target = -0.34;
-        kick *= 0.86; target += kick;
-        tiltDisp += (target - tiltDisp) * 0.2;
+      // Top-down single scull: pointed hull (bow at +x), a rower amidships, and
+      // TWO sculling oars that sweep together. Heading noses toward the vertical
+      // travel direction; a click adds a little dig/kick. Purely cosmetic.
+      function drawBoat(bwx, by, tick, vy) {
+        var target = vy * 0.055; if (target > 0.4) target = 0.4; else if (target < -0.4) target = -0.4;
+        kick *= 0.85; target += kick;
+        tiltDisp += (target - tiltDisp) * 0.22;
 
-        var phase = tick * 0.13;
-        var sweep = Math.sin(phase);
-        var slide = Math.cos(phase) * 3;
+        var phase = tick * 0.16;
+        var sweep = Math.sin(phase);            // +1 = blades swept to the stern (the drive)
+        var drive = sweep > 0;
+
+        var HL = 46, HW = 13, RIG = 28;         // hull half-length / half-width, rigger reach
 
         ctx.save();
-        ctx.translate(bx, by);
+        ctx.translate(bwx, by);
         ctx.rotate(tiltDisp);
 
-        // far oar (faint)
-        drawOar(phase + Math.PI, 'rgba(60,50,40,0.4)', 'rgba(180,170,150,0.5)', 0.8);
-        // hull (needle shell)
-        ctx.fillStyle = '#2f2a25';
+        // oars first (under the hull), both sides together
+        drawSculls(sweep, drive);
+
+        // hull
+        ctx.fillStyle = '#efe6d3';
         ctx.beginPath();
-        ctx.moveTo(-42, 0);
-        ctx.quadraticCurveTo(-30, -8, 40, -3);
-        ctx.quadraticCurveTo(54, 0, 40, 3);
-        ctx.quadraticCurveTo(-30, 8, -42, 0);
+        ctx.moveTo(HL, 0);
+        ctx.quadraticCurveTo(HL * 0.35, -HW, -HL * 0.5, -HW * 0.86);
+        ctx.quadraticCurveTo(-HL, -HW * 0.4, -HL, 0);
+        ctx.quadraticCurveTo(-HL, HW * 0.4, -HL * 0.5, HW * 0.86);
+        ctx.quadraticCurveTo(HL * 0.35, HW, HL, 0);
         ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#5a4a3a';
-        ctx.beginPath(); ctx.ellipse(-2, -1, 30, 3.2, 0, 0, Math.PI * 2); ctx.fill();
-        // rower (slides fore/aft)
+        ctx.strokeStyle = '#b7aa90'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.strokeStyle = 'rgba(150,120,80,0.45)'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(-HL * 0.72, 0); ctx.lineTo(HL * 0.82, 0); ctx.stroke();
+
+        // riggers (little struts out to the pins)
+        ctx.strokeStyle = '#7a6d58'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-4, -HW * 0.4); ctx.lineTo(6, -13); ctx.moveTo(8, -HW * 0.4); ctx.lineTo(-2, -13);
+        ctx.moveTo(-4, HW * 0.4); ctx.lineTo(6, 13); ctx.moveTo(8, HW * 0.4); ctx.lineTo(-2, 13);
+        ctx.stroke();
+
+        // rower (top-down: shoulders + head), slides sternward on the recovery
+        var slide = -sweep * 5;
         ctx.save(); ctx.translate(slide, 0);
         ctx.fillStyle = '#c0431f';
-        ctx.beginPath(); ctx.ellipse(0, -8, 6, 8, 0, 0, Math.PI * 2); ctx.fill(); // torso
+        ctx.beginPath(); ctx.ellipse(0, 0, 9, 7.5, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#e9c9a0';
-        ctx.beginPath(); ctx.arc(0, -17, 4.2, 0, Math.PI * 2); ctx.fill();        // head
+        ctx.beginPath(); ctx.arc(4, 0, 4.6, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
-        // near oar (over the rower)
-        drawOar(phase, '#3a3128', '#efe3c4', 1);
 
-        // catch splash when the blade bites
-        if (sweep > 0.82) {
-          ctx.beginPath(); ctx.arc(14, 15, 4.5, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
+        // bow wave on a hard catch (the "kick")
+        if (kick < -0.03) {
+          ctx.beginPath(); ctx.moveTo(HL + 2, -6); ctx.lineTo(HL + 12, 0); ctx.lineTo(HL + 2, 6);
+          ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2; ctx.stroke();
         }
         ctx.restore();
       }
 
-      function drawOar(phase, shaft, blade, scale) {
-        var ox = 3, oy = -7;               // rigger pivot
-        var bx = ox + Math.cos(phase) * 30 * scale;
-        var byv = oy + 15 + Math.sin(phase) * 12 * scale;
-        ctx.strokeStyle = shaft; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(bx, byv); ctx.stroke();
-        ctx.save(); ctx.translate(bx, byv); ctx.rotate(phase);
-        ctx.fillStyle = blade;
-        ctx.beginPath(); ctx.ellipse(0, 0, 7 * scale, 3.4 * scale, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.restore();
+      function drawSculls(sweep, drive) {
+        var pin = 12;                     // pin offset from centerline (both sides)
+        var reach = 30 + (drive ? 5 : -3);
+        var bladeX = sweep * 20;          // fore/aft position of the blades (together)
+        for (var side = -1; side <= 1; side += 2) {
+          var pinY = side * pin;
+          var bx = bladeX, byv = side * reach;
+          ctx.strokeStyle = '#3a3128'; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.moveTo(0, pinY); ctx.lineTo(bx, byv); ctx.stroke();
+          // blade (aligned with the shaft), orange as it bites on the drive
+          ctx.save(); ctx.translate(bx, byv); ctx.rotate(Math.atan2(byv - pinY, bx));
+          ctx.fillStyle = drive ? '#f3722b' : '#e9dcc0';
+          roundRect(-2.5, -1.5, 13, 3, 1.5); ctx.fill();
+          ctx.restore();
+          if (drive) {
+            ctx.beginPath(); ctx.ellipse(bx, byv, 5, 3.2, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fill();
+          }
+        }
       }
 
       function roundRect(x, y, w, h, r) {
@@ -3718,6 +3868,8 @@
       againBtn.addEventListener('click', function () { start(); });
       saveBtn.addEventListener('click', function () { submitScore(); });
       nameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); submitScore(); } });
+
+      window.addEventListener('resize', function () { if (visible() && state) { resize(); draw(); } });
 
       function visible() { return canvas.offsetParent !== null; }
 
