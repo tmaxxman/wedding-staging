@@ -1523,7 +1523,138 @@
         padding: 56px 52px;
       }
     }
-    
+
+    /* ===================== RSVP flow (design 8C "Plain") =====================
+       Ported from rsvp-8C.html into the SPA. #section-rsvp exists in BOTH the
+       desktop and mobile shells, so every hook is class-based and setupRsvp()
+       initializes each .rsvp-root independently. Screens toggle via .is-active;
+       only one shows at a time. All selectors are scoped under .rsvp-root so they
+       outrank the generic `.page-section p/h2` rules. */
+    .rsvp-root {
+      --green: #3f9d5a;
+      max-width: 620px; margin: 0 auto; width: 100%;
+      padding: 8px 0 24px; text-align: center;
+      color: var(--ink); font-family: var(--sans);
+    }
+    .rsvp-root .rsvp-screen { display: none; flex-direction: column; align-items: center; }
+    .rsvp-root .rsvp-screen.is-active { display: flex; }
+    .rsvp-root h1 {
+      margin: 8px 0 0; font-family: var(--serif); font-weight: 500;
+      font-size: 52px; line-height: 1.05; color: var(--ink); text-align: center;
+    }
+    .rsvp-root .rsvp-wedding h1 { font-size: 44px; }
+    .rsvp-root .rsvp-rehearsal h1, .rsvp-root .rsvp-done h1 { font-size: 50px; }
+    .rsvp-root .rsvp-script { font-family: var(--script); color: var(--accent); line-height: 1; font-size: 34px; }
+    .rsvp-root .rsvp-script--sm { font-size: 30px; }
+    .rsvp-root .rsvp-script--lg { font-size: 50px; }
+    .rsvp-root .rsvp-flabel {
+      font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--faint); font-weight: 600; text-align: left;
+    }
+    .rsvp-root .rsvp-meta { font-size: 13px; color: var(--faint); margin: 12px 0 0; max-width: none; line-height: 1.6; }
+    .rsvp-root .rsvp-lede { font-size: 15px; line-height: 1.75; color: var(--muted); margin: 16px auto 0; max-width: 440px; }
+
+    /* name fields */
+    .rsvp-root .rsvp-lookup-form { display: flex; flex-direction: column; align-items: center; width: 100%; }
+    .rsvp-root .rsvp-namefields { margin-top: 30px; display: flex; gap: 18px; width: 100%; max-width: 520px; }
+    .rsvp-root .rsvp-field { flex: 1; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+    .rsvp-root .rsvp-field input {
+      width: 100%; font-family: var(--serif); font-size: 20px; color: var(--ink);
+      background: transparent; border: 0; border-bottom: 1px solid rgba(28,25,23,0.35);
+      padding: 8px 2px; outline: none;
+    }
+    .rsvp-root .rsvp-field input:focus { border-bottom-color: var(--accent); }
+
+    /* buttons */
+    .rsvp-root .rsvp-btn {
+      margin-top: 30px; display: inline-block; border: 0; cursor: pointer;
+      font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 0.2em;
+      text-transform: uppercase; color: var(--bg); background: var(--accent); padding: 18px 56px;
+      transition: background .18s;
+    }
+    .rsvp-root .rsvp-btn:hover { background: var(--ink); }
+    .rsvp-root .rsvp-btn[disabled] { opacity: .38; cursor: default; background: var(--accent); }
+    .rsvp-root .rsvp-btn-ghost {
+      margin-top: 30px; display: inline-block; font-size: 12px; font-weight: 600;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink); cursor: pointer;
+      border: 1px solid rgba(28,25,23,0.25); padding: 17px 36px; transition: border-color .18s;
+    }
+    .rsvp-root .rsvp-btn-ghost:hover { border-color: var(--accent); }
+    .rsvp-root .rsvp-fineprint { margin: 18px 0 0; font-size: 12px; line-height: 1.7; color: var(--faint); max-width: none; }
+    .rsvp-root .rsvp-fineprint a { color: var(--accent); border-bottom: 1px solid rgba(243,114,43,0.4); text-decoration: none; }
+
+    /* guest rows */
+    .rsvp-root .rsvp-guests {
+      margin-top: 24px; width: 100%; max-width: 560px;
+      display: flex; flex-direction: column; text-align: left;
+      border-top: 1px solid rgba(28,25,23,0.14);
+    }
+    .rsvp-root .rsvp-guest { width: 100%; display: flex; flex-direction: column; gap: 6px; padding: 15px 0; border-bottom: 1px solid rgba(28,25,23,0.1); }
+    .rsvp-root .rsvp-guest-top { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .rsvp-root .rsvp-guest-name { font-family: var(--serif); font-size: 21px; }
+    .rsvp-root .rsvp-pills { display: inline-flex; gap: 8px; flex: none; }
+    .rsvp-root .rsvp-pill {
+      font-family: var(--sans); cursor: pointer; font-size: 11px; font-weight: 600;
+      letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+      color: var(--faint); background: transparent;
+      border: 1px solid rgba(28,25,23,0.2); padding: 8px 18px; border-radius: 999px;
+      transition: color .15s, background .15s, border-color .15s;
+    }
+    .rsvp-root .rsvp-pill:hover { border-color: var(--accent); color: var(--ink); }
+    .rsvp-root .rsvp-pill[aria-pressed="true"] { color: var(--bg); background: var(--green); border-color: var(--green); }
+
+    /* dinner reveal — hidden until "Will attend" is chosen */
+    .rsvp-root .rsvp-reveal { display: none; flex-direction: column; gap: 8px; margin-top: 2px; padding: 12px 0 2px; }
+    .rsvp-root .rsvp-guest.attending .rsvp-reveal { display: flex; }
+    .rsvp-root .rsvp-meals { display: flex; gap: 8px; }
+    .rsvp-root .rsvp-meal {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 9px; cursor: pointer;
+      font-family: var(--sans); font-size: 13.5px; color: var(--muted);
+      background: transparent; border: 1px solid rgba(28,25,23,0.15); padding: 12px 10px;
+      transition: border-color .15s, color .15s;
+    }
+    .rsvp-root .rsvp-meal:hover { border-color: rgba(243,114,43,0.5); }
+    .rsvp-root .rsvp-meal .rsvp-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; border: 1px solid rgba(28,25,23,0.3); }
+    .rsvp-root .rsvp-meal[aria-pressed="true"] { border-color: var(--accent); background: #fff; color: var(--ink); }
+    .rsvp-root .rsvp-meal[aria-pressed="true"] .rsvp-dot { background: var(--accent); border-color: var(--accent); }
+    .rsvp-root .rsvp-diet { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
+    .rsvp-root .rsvp-diet input {
+      width: 100%; font-family: var(--sans); font-size: 13.5px; color: var(--ink); background: #fff;
+      border: 1px solid rgba(28,25,23,0.18); padding: 11px 14px; outline: none;
+    }
+    .rsvp-root .rsvp-diet input:focus { border-color: var(--accent); }
+
+    /* confirmation summary */
+    .rsvp-root .rsvp-summary { margin-top: 26px; width: 100%; max-width: 520px; display: flex; flex-direction: column; border-top: 1px solid rgba(28,25,23,0.14); text-align: left; }
+    .rsvp-root .rsvp-summary-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 14px 2px; border-bottom: 1px solid rgba(28,25,23,0.1); }
+    .rsvp-root .rsvp-summary-row dt { font-size: 13px; color: var(--muted); }
+    .rsvp-root .rsvp-summary-row dd { margin: 0; font-family: var(--serif); font-size: 17px; text-align: right; }
+
+    @media (max-width: 768px) {
+      .rsvp-root { max-width: 100%; padding: 4px 0 20px; }
+      .rsvp-root .rsvp-screen { align-items: stretch; }
+      .rsvp-root h1 { font-size: 36px; line-height: 1.06; }
+      .rsvp-root .rsvp-wedding h1 { font-size: 30px; }
+      .rsvp-root .rsvp-rehearsal h1 { font-size: 36px; }
+      .rsvp-root .rsvp-done h1 { font-size: 34px; }
+      .rsvp-root .rsvp-script { font-size: 28px; }
+      .rsvp-root .rsvp-script--sm { font-size: 26px; }
+      .rsvp-root .rsvp-script--lg { font-size: 38px; }
+      .rsvp-root .rsvp-lede { font-size: 13px; line-height: 1.7; }
+      .rsvp-root .rsvp-meta { font-size: 11.5px; }
+      .rsvp-root .rsvp-namefields { margin-top: 26px; flex-direction: column; gap: 18px; }
+      .rsvp-root .rsvp-guests { margin-top: 18px; max-width: 100%; }
+      .rsvp-root .rsvp-guest-top { flex-direction: column; align-items: stretch; gap: 8px; }
+      .rsvp-root .rsvp-guest-name { font-size: 18px; }
+      .rsvp-root .rsvp-pills { display: flex; }
+      .rsvp-root .rsvp-pill { flex: 1; text-align: center; padding: 11px 6px; border-radius: 0; letter-spacing: 0.1em; }
+      .rsvp-root .rsvp-meals { flex-direction: column; }
+      .rsvp-root .rsvp-meal { justify-content: flex-start; padding: 11px 14px; font-size: 13px; }
+      /* full-width primary actions on mobile (inline, robust within the SPA chrome) */
+      .rsvp-root .rsvp-btn, .rsvp-root .rsvp-btn-ghost { display: block; width: 100%; text-align: center; padding: 18px 20px; margin-top: 22px; }
+      .rsvp-root .rsvp-summary-row dd { font-size: 15px; }
+    }
+
     /* Q+A FAQ Accordion styles */
     .qa-container {
       max-width: 700px;
@@ -2604,7 +2735,7 @@
     // This properly handles iOS keyboard open/close without JavaScript manipulation
     
     // Encrypted wedding content (generated by build.js)
-    const ENCRYPTED_DATA = '{"salt":"ce988ce86685e7caa2fde6d3d7eb8b58","iv":"cb541205f2f22b6d693e80875c50e37b","authTag":"c3822d4ab6c5377dd645ec80d076e2ee","content":"9035ccde08e08820ecb687d5bb16adc208fdae7e498ea39938816678f94201ccfc4413688077bd7dd4d6b89e8a8db8db1211afe6e9453ea0f42e6c6cf0f02ec658bcd8357743ef0361c5cd5963a5279ea6a196dbb46cad8df74492e23d8ce60db0cb3f4ee07aaafdc5e0cdbf0a4d181ae3e773c9cc2a365a6edd3a66a7d7490a68edb88c47f565f89a3c82fd682e05c690c8f41a34c2413af6adec0230e5774cfe07dd1b80ee4856edb27758ed2f3648de16ef045e4fbe38612ddec6ecd96edaa53b1d7afc7ae1eea463606d991e391933c7005863b1fe49abeed0a9a6ab5724731fd0a31f76409054818f89fa1d6db8174a1355615de709243652ca4b9a89c1ada4855213e27425533dfe6b38a94f57123add900711abdf849eff45e9286e215de6dc594ec64f277200a84cdfb573788806d2cb414bb5a2d1be3253bb5b00e93c5a7633c498ddebd86460370183d88c0d4e77c434dabd1062a56b53fc76dec128f8c287c7d6f34046d007e4a851f4d5bee35f2fe1429b97d7923ab2d588ee2d92209a00d05d67c33ffdb213916a4c87d045f6df572b28c8d6da5737badf079d8e51c8d58691e891696f29b60375e10574401664d6c755f23a9adfaa26c77489a6e58d3abd9229cdd6fcd30d07422af448547a525682f18decf1d8d2e53ca138c1fc537c1070d78ea30f356dd21954545d3ad03d4978211c669b27bacd348d85ae99c59d8e90af0d42b5f555edcb98d89b2f4f26cdf24b84f1ff356f5a84fb96c7e6b10861f1a9baa48fc583642f04d813459f770a9c4f8de9c9786e84b7a2351dc623e73ed279a8b9238539319ba7e76bbafdfcdefedfd67972f028aff29f7652334120c000d8aa9d293d25940e2603c6c8032412e047165ed7dfb5d508b0833f0b0dc9b2af5b54ba26cbea23474574d9e005bbd03bf496e7cf9c0710b88b5edde6201a302bed20168b9adfb9118cacd0e2b45e02e5875cd5bd4db05d5a5ca06be7453ffd43df9bde194062adc529087457c83fbabd7b0e09862f45beccbfafa8ab4fe3aa0b9613b741292062187e5d23596a6eed197e8f2c88be85693c99ef51b6ccbe33736fef8121d20f17a5235af196bd41aeeae340a5db4cafa0569f2ce85fdb9559037a15dadb1f8652680e9cccd333ac05348997c3c807ffaa73167f721707c7e36d0b56b437e3bc5641bbf77ac39dd634348dedf017e1f2803064d44ed8ef61f63cb94564207eed6fa4cd7c1e1d08e2dc9709d736b01cf53d899c5ce2eb99dea289edd2e6fc341751824cc8a72029b4346164b0c76bb6d1e9f591afddee2979dcc4635934e4c1e68ebe9e2929de74405bbe7839298654708277c40c33f15f93e2d60095691d69326d8741d5be034ffbc1234405eebd255707201c0977bbf13d217e4b098d8dd70610b211cce958fc91a3de9432eec446f25d7555fca92dc63add0bf70760cf87c53be2d6"}';
+    const ENCRYPTED_DATA = '{"salt":"b721f3b6807648d9d788278c11872b34","iv":"92abd7dfda74a24adce3d53026ac757c","authTag":"df5d21fe71d49033866110acb827371e","content":"715f99ee0e5f4924fe324227c55dae05a4cf35f34c6178f71ec0fef3ecc400dd7eeafce0e3792f4bb9efc2ce9d9ffaf3608efd4b660f08d8416f088b5069470d6dc33b85740c92660d35114e7074d3251a9692b6b31361b40ec83649a8209c7f8497dbc1aab13212f97c073eb88c1a4a6e7ebb506f1dcaee6d4d07029b1e1c7363d2515b8813d1874891a298086a2e3c4d03ce1435ccd4f70f55c03d3b239653359d4acf735a9f2d40392cdf7962cc7e687e6568ac3fda70430eb3a5cfba5a8694e7e847cd3b05a543fdf6a17c2e8fe9e498d3ec67f1e55beb974ac4e3ae04e03fdd981577cd4b751c7cf48c8067a9097c42e6186b738cddc77460dfaca99e09f3121b9248c07e88b46599c7c41489d976a4647a2fe7f490d53a331ce3ed5f294224494692636aa4ec2d92d5ea4c8d5a53c4e75cd3ef6e18391d26891a4b662337611f46ba19fd5ab303b19f304ac006dec28a80b9b62468a70676fcbaedee62d2656f2c7309007b6d08dd9e5b231afda14168b737e8ae4dfec5b48c2e7133a0074bcec04424a304a440bc29824a074aea27f32c2afd5b0cc054224e5490eccea723b20e1ec7eb213e06c6017b0cca3b5541cae77c84a7bda60cfd6a1073703d0bcd6ba2d546c082bd0f80b3edbf092eda5f296efb0ebf4a4cd9cd45679435c0b1666132b5d530f4826c2066869328add58285018be3d3e6e643ba135d39af0bb4f10e883f7c91ca0b7c4f2ed9ca0d165491187eebf88baf213e45f0e0b8efa72b3c53942a2de3cc4aeb47055ce73315f1437f4955887379765fd125fc85287dfc7d6efa41c81ee8398691735fb081483ca164d877dff2936edfb316a68f72307e40f27edc4d76367e7ea12b8e5fb71caba1cebaf795137627b234a3dea2a18aa3a3a7292c56ff4747a58c08a65e5cd622e9bdd976d9ec933ecdd187fde8101ccc1eb8ab1e9d339c02bea6072024ee8af30a5522a683c575261391ac7d78d01e6a955777f1a1acfdbd40beebef355f3de7adcf177f9fd911eea012be75f92020cb68654cd1308a8513d341eef281cb01a57f72aaf2ac7acc3cfafc4d132497e823ff3e70c0638a36193140aa6bc954045bfe6fd6aadd296ca2e8955c804a389a80f3e48e4621589bd5a87b194eb46ae0a7e07615763332cf07d6da8f66d4b8fbc67b2516cc69ed37a77e2f0180b071656952cb9eec4af7947b9e02f0703980669003643393c2832701df9e226350765b9c2a62bd770bbd1ade89c62259c098d466edbae75eb4c93e89f5c03ea7e503b5903fd9018ab09dc6523db32a8f6bb0fd49319d4f923c8d5f856311920ea5f94b2cdf6a856a611633b90fae6ad397160c239119880d952a53026ea7b6905d0bb8b390f67b9293da8a90bda78483f407b6548413c3d16d71a309ce126bfa72eeaadf12a376e00d213fd7675f3309823f72da712d0187ab9cf6ebf4d46a33bc4a"}';
 
     // Hold the password box behind a "Loading…" state until the background
     // video has painted its first frame (or we time out / it errors), so the
@@ -3126,10 +3257,58 @@
           <p>Our favorite spots and activities in Boston.</p>
         </section>
         
-        <!-- RSVP Section -->
+        <!-- RSVP Section (flow ported from rsvp-8C.html; wired in setupRsvp) -->
         <section class="page-section" id="section-rsvp">
-          <h2>RSVP</h2>
-          <p>Coming soon.</p>
+          <div class="rsvp-root">
+            <!-- 1. LOOKUP -->
+            <section class="rsvp-screen rsvp-lookup is-active">
+              <div class="rsvp-script">we hope you can make it</div>
+              <h1>Find your invitation</h1>
+              <p class="rsvp-lede">Enter your name as it appears on your envelope. We&rsquo;ll pull up your party.</p>
+              <form class="rsvp-lookup-form" autocomplete="off" novalidate>
+                <div class="rsvp-namefields">
+                  <label class="rsvp-field">
+                    <span class="rsvp-flabel">First name</span>
+                    <input type="text" class="rsvp-first" required>
+                  </label>
+                  <label class="rsvp-field">
+                    <span class="rsvp-flabel">Last name</span>
+                    <input type="text" class="rsvp-last" required>
+                  </label>
+                </div>
+                <button class="rsvp-btn rsvp-lookup-btn" type="submit">Find my invitation</button>
+              </form>
+              <p class="rsvp-fineprint rsvp-lookup-msg">Can&rsquo;t find yourself? <a href="mailto:hello@meghanandnolan.com">Email us</a></p>
+            </section>
+
+            <!-- 2. WEDDING -->
+            <section class="rsvp-screen rsvp-wedding">
+              <div class="rsvp-script rsvp-script--sm">found you!</div>
+              <h1 class="rsvp-party-name">&nbsp;</h1>
+              <p class="rsvp-meta">Thursday, December 31 &middot; 6:30 pm &middot; Arlington Street Church</p>
+              <div class="rsvp-guests" data-kind="wedding"></div>
+              <button class="rsvp-btn rsvp-next" data-kind="wedding">Continue</button>
+            </section>
+
+            <!-- 3. REHEARSAL DINNER (skipped if the party isn't invited) -->
+            <section class="rsvp-screen rsvp-rehearsal">
+              <div class="rsvp-script">the night before</div>
+              <h1>Rehearsal Dinner</h1>
+              <p class="rsvp-meta">Wednesday, December 30 &middot; 7:00 pm &middot; SRV</p>
+              <p class="rsvp-lede">A smaller night with the people closest to us &mdash; we&rsquo;d love you there.</p>
+              <div class="rsvp-guests" data-kind="rehearsal"></div>
+              <button class="rsvp-btn rsvp-next" data-kind="rehearsal">Send our reply</button>
+            </section>
+
+            <!-- 4. CONFIRMATION -->
+            <section class="rsvp-screen rsvp-done">
+              <div class="rsvp-script rsvp-script--lg">see you on the dance floor</div>
+              <h1>You&rsquo;re on the list!</h1>
+              <p class="rsvp-lede rsvp-done-lede"></p>
+              <dl class="rsvp-summary"></dl>
+              <a class="rsvp-btn-ghost" href="/travel" onclick="showSection('travel'); return false;">Book Hotels &amp; Travel</a>
+            </section>
+          </div>
         </section>
         
         <!-- Registry Section -->
@@ -3279,10 +3458,10 @@
             <a href="/travel" onclick="showSection('travel'); return false;">Hotels & Travel</a>
             <a href="/photos" onclick="showSection('photos'); return false;">Photos</a>
             <a href="/registry" onclick="showSection('registry'); return false;">Registry</a>
+            <a href="/rsvp" onclick="showSection('rsvp'); return false;">RSVP</a>
             <a href="/qa" onclick="showSection('qa'); return false;">Q + A</a>
             <a href="/game" onclick="showSection('game'); return false;">Game</a>
             <!-- <a href="/things" onclick="showSection('things'); return false;">Things to Do</a> -->
-            <!-- <a href="/rsvp" onclick="showSection('rsvp'); return false;">RSVP</a> -->
           </nav>
           <div class="desktop-sections">
             ${sectionsHTML}
@@ -3311,6 +3490,7 @@
             <a href="/travel" onclick="showSection('travel'); return false;">Hotels & Travel</a>
             <a href="/photos" onclick="showSection('photos'); return false;">Photos</a>
             <a href="/registry" onclick="showSection('registry'); return false;">Registry</a>
+            <a href="/rsvp" onclick="showSection('rsvp'); return false;">RSVP</a>
             <a href="/qa" onclick="showSection('qa'); return false;">Q + A</a>
             <a href="/game" onclick="showSection('game'); return false;">Game</a>
           </nav>
@@ -3384,6 +3564,9 @@
 
       // Wire up the rowing game (both shells have their own canvas)
       initGame();
+
+      // Wire up the RSVP flow (both shells have their own .rsvp-root)
+      initRsvp();
     }
 
     // ===================== Photo gallery =====================
@@ -4562,6 +4745,243 @@
       }
     }
     
+    // ===================== RSVP flow =====================
+    // Ported from rsvp-8C.html. #section-rsvp is duplicated across the desktop
+    // and mobile shells, so we initialize each .rsvp-root independently and
+    // scope every query to that root. The mock party below stands in until the
+    // Google Sheet lookup/submit is wired: replace rsvpLookupParty (pull the
+    // party by name from the sheet) and rsvpSubmit (POST answers to the sheet).
+    var RSVP_MEALS = ['Beef', 'Fish', 'Vegetarian'];
+    // [1] Mock guest list — swap for the Google Sheet lookup. Keys are
+    // "firstname lastname" lowercased; every guest maps to the same party.
+    var RSVP_PARTIES = [
+      { name: 'Meghan Wheeler & Nolan Pollock', guests: ['Meghan Wheeler', 'Nolan Pollock'], rehearsal: true }
+    ];
+    var RSVP_GUESTS = {};
+    RSVP_PARTIES.forEach(function (p) {
+      p.guests.forEach(function (g) { RSVP_GUESTS[g.toLowerCase().replace(/\s+/g, ' ').trim()] = p; });
+    });
+
+    // [1] Swap for a real request. Return a party object or null.
+    function rsvpLookupParty(first, last) {
+      var key = (first + ' ' + last).toLowerCase().replace(/\s+/g, ' ').trim();
+      return RSVP_GUESTS[key] || null;
+    }
+    // [2] Swap for a real POST to the sheet endpoint. Resolve on success, reject
+    // to keep the guest on the form. Payload shape:
+    // { party, wedding: {Guest: {attending, meal, diet}}, rehearsal: {...}|null }
+    function rsvpSubmit(payload) {
+      console.log('RSVP payload', payload);
+      return Promise.resolve();
+    }
+
+    function initRsvp() {
+      document.querySelectorAll('.rsvp-root').forEach(function (root) {
+        if (root._rsvpInit) return;
+        root._rsvpInit = true;
+        setupRsvp(root);
+      });
+    }
+
+    function setupRsvp(root) {
+      var state = { party: null, wedding: {}, rehearsal: {} };
+      var screens = {
+        lookup: root.querySelector('.rsvp-lookup'),
+        wedding: root.querySelector('.rsvp-wedding'),
+        rehearsal: root.querySelector('.rsvp-rehearsal'),
+        done: root.querySelector('.rsvp-done')
+      };
+
+      function show(name) {
+        Object.keys(screens).forEach(function (k) {
+          screens[k].classList.toggle('is-active', k === name);
+        });
+        // Scroll the active scroll container back to the top on step change.
+        var sc = root.closest('.mobile-scroll-container, .desktop-scroll-container');
+        if (sc) sc.scrollTop = 0;
+      }
+
+      // kind: "wedding" (with dinner reveal) or "rehearsal" (attendance only)
+      function renderGuests(kind) {
+        var host = root.querySelector('.rsvp-guests[data-kind="' + kind + '"]');
+        host.textContent = '';
+        state.party.guests.forEach(function (guest) {
+          state[kind][guest] = state[kind][guest] || { attending: null, meal: null, diet: '' };
+          var answer = state[kind][guest];
+
+          var row = document.createElement('div');
+          row.className = 'rsvp-guest';
+
+          var top = document.createElement('div');
+          top.className = 'rsvp-guest-top';
+          var nm = document.createElement('span');
+          nm.className = 'rsvp-guest-name';
+          nm.textContent = guest;
+          var pills = document.createElement('div');
+          pills.className = 'rsvp-pills';
+          top.appendChild(nm); top.appendChild(pills);
+          row.appendChild(top);
+
+          [['Will attend', true], ['Cannot attend', false]].forEach(function (opt) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'rsvp-pill';
+            b.textContent = opt[0];
+            b.setAttribute('aria-pressed', String(answer.attending === opt[1]));
+            b.addEventListener('click', function () {
+              answer.attending = opt[1];
+              // declining clears the meal so we never submit a stale choice
+              if (!opt[1]) { answer.meal = null; answer.diet = ''; }
+              renderGuests(kind);
+              updateNext(kind);
+            });
+            pills.appendChild(b);
+          });
+
+          if (kind === 'wedding') {
+            if (answer.attending === true) row.classList.add('attending');
+            var reveal = document.createElement('div');
+            reveal.className = 'rsvp-reveal';
+
+            var mealLabel = document.createElement('span');
+            mealLabel.className = 'rsvp-flabel';
+            mealLabel.textContent = 'Dinner choice';
+            var meals = document.createElement('div');
+            meals.className = 'rsvp-meals';
+            RSVP_MEALS.forEach(function (meal) {
+              var b = document.createElement('button');
+              b.type = 'button';
+              b.className = 'rsvp-meal';
+              b.setAttribute('aria-pressed', String(answer.meal === meal));
+              var dot = document.createElement('span');
+              dot.className = 'rsvp-dot';
+              b.appendChild(dot);
+              b.appendChild(document.createTextNode(meal));
+              b.addEventListener('click', function () {
+                answer.meal = meal;
+                renderGuests(kind);
+                updateNext(kind);
+              });
+              meals.appendChild(b);
+            });
+
+            var diet = document.createElement('label');
+            diet.className = 'rsvp-diet';
+            var dietLabel = document.createElement('span');
+            dietLabel.className = 'rsvp-flabel';
+            dietLabel.textContent = 'Dietary restrictions';
+            var dietInput = document.createElement('input');
+            dietInput.type = 'text';
+            dietInput.placeholder = 'Allergies or anything else the kitchen should know (optional)';
+            dietInput.value = answer.diet;
+            dietInput.addEventListener('input', function (e) { answer.diet = e.target.value; });
+            diet.appendChild(dietLabel); diet.appendChild(dietInput);
+
+            reveal.appendChild(mealLabel); reveal.appendChild(meals); reveal.appendChild(diet);
+            row.appendChild(reveal);
+          }
+
+          host.appendChild(row);
+        });
+      }
+
+      // every guest must answer; attendees must also pick a meal (wedding only)
+      function updateNext(kind) {
+        var complete = state.party.guests.every(function (g) {
+          var a = state[kind][g];
+          if (!a || a.attending === null) return false;
+          return !(kind === 'wedding' && a.attending && !a.meal);
+        });
+        root.querySelector('.rsvp-next[data-kind="' + kind + '"]').disabled = !complete;
+      }
+
+      // step 1: lookup
+      root.querySelector('.rsvp-lookup-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var first = root.querySelector('.rsvp-first').value;
+        var last = root.querySelector('.rsvp-last').value;
+        var party = rsvpLookupParty(first, last);
+        var msg = root.querySelector('.rsvp-lookup-msg');
+        if (!party) {
+          msg.innerHTML = 'We couldn&rsquo;t find that name. Check the spelling, or <a href="mailto:hello@meghanandnolan.com">email us</a>.';
+          return;
+        }
+        msg.innerHTML = 'Can&rsquo;t find yourself? <a href="mailto:hello@meghanandnolan.com">Email us</a>';
+        state.party = party;
+        state.wedding = {}; state.rehearsal = {};
+        root.querySelector('.rsvp-party-name').textContent = party.name;
+        renderGuests('wedding');
+        updateNext('wedding');
+        show('wedding');
+      });
+
+      // step 2 -> 3 (or straight to 4 when no rehearsal invite)
+      root.querySelector('.rsvp-next[data-kind="wedding"]').addEventListener('click', function () {
+        if (state.party.rehearsal) {
+          renderGuests('rehearsal');
+          updateNext('rehearsal');
+          show('rehearsal');
+        } else {
+          finish();
+        }
+      });
+      // step 3 -> 4
+      root.querySelector('.rsvp-next[data-kind="rehearsal"]').addEventListener('click', finish);
+
+      function finish() {
+        var payload = {
+          party: state.party.name,
+          wedding: state.wedding,
+          rehearsal: state.party.rehearsal ? state.rehearsal : null
+        };
+        rsvpSubmit(payload).then(function () {
+          renderSummary();
+          show('done');
+        });
+      }
+
+      function renderSummary() {
+        function yes(kind) {
+          return state.party.guests.filter(function (g) { return state[kind][g] && state[kind][g].attending; });
+        }
+        function phrase(list) {
+          if (!list.length) return 'Not attending';
+          if (list.length === state.party.guests.length) return list.length > 1 ? 'All of you' : list[0];
+          return list.map(function (n) { return n.split(' ')[0]; }).join(' & ') + ' only';
+        }
+        var rows = [['Wedding &middot; Dec 31', phrase(yes('wedding'))]];
+        if (state.party.rehearsal) rows.push(['Rehearsal &middot; Dec 30', phrase(yes('rehearsal'))]);
+
+        var dl = root.querySelector('.rsvp-summary');
+        dl.textContent = '';
+        rows.forEach(function (r) {
+          var row = document.createElement('div');
+          row.className = 'rsvp-summary-row';
+          var dt = document.createElement('dt');
+          dt.innerHTML = r[0];
+          var dd = document.createElement('dd');
+          dd.textContent = r[1];
+          row.appendChild(dt); row.appendChild(dd);
+          dl.appendChild(row);
+        });
+
+        var going = yes('wedding').length > 0;
+        root.querySelector('.rsvp-done-lede').textContent = going
+          ? 'One very good excuse to stay up past midnight. A copy is on its way to your email.'
+          : 'We\u2019ll miss you \u2014 thank you for letting us know. A copy is on its way to your email.';
+      }
+
+      // Reset back to step 1 (called on each navigation into the RSVP page).
+      root._rsvpReset = function () {
+        state.party = null; state.wedding = {}; state.rehearsal = {};
+        var f = root.querySelector('.rsvp-first'); if (f) f.value = '';
+        var l = root.querySelector('.rsvp-last'); if (l) l.value = '';
+        var msg = root.querySelector('.rsvp-lookup-msg');
+        if (msg) msg.innerHTML = 'Can&rsquo;t find yourself? <a href="mailto:hello@meghanandnolan.com">Email us</a>';
+        show('lookup');
+      };
+    }
+
     function showSection(sectionId) {
       // Section title mapping
       const titles = {
@@ -4651,6 +5071,12 @@
           mainContent.classList.add('home-page-active');
         } else {
           mainContent.classList.remove('home-page-active');
+        }
+        // RSVP page — start each visit fresh at the lookup step
+        if (sectionId === 'rsvp') {
+          document.querySelectorAll('.rsvp-root').forEach(function (r) {
+            if (r._rsvpReset) r._rsvpReset();
+          });
         }
       }
       
@@ -4764,6 +5190,12 @@
           mainContent.classList.add('home-page-active');
         } else {
           mainContent.classList.remove('home-page-active');
+        }
+        // RSVP page — start each visit fresh at the lookup step
+        if (sectionId === 'rsvp') {
+          document.querySelectorAll('.rsvp-root').forEach(function (r) {
+            if (r._rsvpReset) r._rsvpReset();
+          });
         }
       }
     }
